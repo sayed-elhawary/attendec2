@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QMessageBox, QFrame, QStackedWidget, QGridLayout,
-    QGraphicsDropShadowEffect, QSizePolicy, QCheckBox
+    QSizePolicy, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QColor, QPixmap, QIcon, QFont
@@ -10,50 +10,123 @@ from database import verify_user, create_user
 
 
 # ============================================================
-#                نظام الألوان
+#     نظام ألوان مسطح وهادئ (نفس تصميم باقي التطبيق)
 # ============================================================
-BG          = "#f1f5f9"
+BG          = "#eef0f3"
 SURFACE     = "#ffffff"
-SURFACE_2   = "#f8fafc"
-BORDER      = "#e2e8f0"
-BORDER_2    = "#cbd5e1"
+SURFACE_2   = "#f8f9fa"
+SURFACE_3   = "#f1f3f5"
+BORDER      = "#d8dce1"
+BORDER_2    = "#c3c9d0"
+DIVIDER     = "#e8ebee"
 
-TEXT        = "#0f172a"
-TEXT_SEC    = "#475569"
-TEXT_MUTED  = "#94a3b8"
+TEXT        = "#1f2933"
+TEXT_SEC    = "#4b5563"
+TEXT_MUTED  = "#7b8794"
 
-NAVY        = "#0b1729"
-NAVY_2      = "#132a4a"
-NAVY_3      = "#1e3a5f"
-NAVY_ACCENT = "#1e40af"
+PRIMARY     = "#1f4e8c"
+PRIMARY_HOV = "#1a4275"
+PRIMARY_DK  = "#153561"
+PRIMARY_BG  = "#e8eff8"
+PRIMARY_BRD = "#b6c8e0"
 
-PRIMARY     = "#2563eb"
-PRIMARY_HOV = "#1d4ed8"
-PRIMARY_DK  = "#1e40af"
-PRIMARY_BG  = "#eff6ff"
-PRIMARY_BRD = "#bfdbfe"
+SUCCESS     = "#2f7d4f"
+SUCCESS_HOV = "#276a43"
+SUCCESS_BG  = "#eaf4ee"
+SUCCESS_BRD = "#b9d9c5"
 
-SUCCESS     = "#059669"
-SUCCESS_HOV = "#047857"
-SUCCESS_BG  = "#ecfdf5"
-SUCCESS_BRD = "#a7f3d0"
+DANGER      = "#b3372f"
+DANGER_HOV  = "#992d26"
+DANGER_BG   = "#fbeceb"
+DANGER_BRD  = "#e6b9b5"
 
-DANGER      = "#dc2626"
-DANGER_BG   = "#fef2f2"
-DANGER_BRD  = "#fecaca"
+WARNING     = "#a86a12"
+WARNING_BG  = "#fbf3e4"
+WARNING_BRD = "#e6cf9f"
+
+INFO        = "#2a6f8f"
+INFO_BG     = "#e9f2f6"
+INFO_BRD    = "#b5d2df"
 
 FONT_FAMILY = "Segoe UI, Tahoma, Arial, sans-serif"
 
+RADIUS = "4px"
 
-def apply_shadow(widget, blur=30, y_offset=8, alpha=40):
-    """ظل ناعم احترافي"""
-    effect = QGraphicsDropShadowEffect(widget)
-    effect.setBlurRadius(blur)
-    effect.setXOffset(0)
-    effect.setYOffset(y_offset)
-    effect.setColor(QColor(15, 23, 42, alpha))
-    widget.setGraphicsEffect(effect)
-    return effect
+
+def _primary_btn_style(size=13):
+    return f"""
+        QPushButton {{
+            background:{PRIMARY}; color:white;
+            border:1px solid {PRIMARY}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:700; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{PRIMARY_HOV}; border-color:{PRIMARY_HOV}; }}
+        QPushButton:pressed {{ background:{PRIMARY_DK}; border-color:{PRIMARY_DK}; }}
+    """
+
+
+def _secondary_btn_style(size=13):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{TEXT};
+            border:1px solid {BORDER_2}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SURFACE_3}; border-color:{TEXT_MUTED}; }}
+        QPushButton:pressed {{ background:{DIVIDER}; }}
+    """
+
+
+def _success_btn_style(size=13):
+    return f"""
+        QPushButton {{
+            background:{SUCCESS}; color:white;
+            border:1px solid {SUCCESS}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:700; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SUCCESS_HOV}; border-color:{SUCCESS_HOV}; }}
+        QPushButton:pressed {{ background:#1f5f3c; border-color:#1f5f3c; }}
+    """
+
+
+def _link_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:transparent; color:{PRIMARY};
+            border:none; border-radius:{RADIUS};
+            padding:0 6px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ color:{PRIMARY_HOV}; text-decoration:underline; }}
+    """
+
+
+def _input_style():
+    return f"""
+        QLineEdit {{
+            background:{SURFACE}; border:1px solid {BORDER_2};
+            border-radius:{RADIUS}; padding:0 12px;
+            font-size:12.5px; color:{TEXT};
+            font-family:{FONT_FAMILY};
+        }}
+        QLineEdit:hover {{ border-color:{TEXT_MUTED}; }}
+        QLineEdit:focus {{ border:1px solid {PRIMARY}; }}
+    """
+
+
+def _field_label_style():
+    return f"""
+        QLabel {{
+            font-size:11px;
+            font-weight:700;
+            color:{TEXT_SEC};
+            background:transparent;
+            font-family:{FONT_FAMILY};
+        }}
+    """
 
 
 # ============================================================
@@ -75,7 +148,7 @@ class LoginPage(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # الجهة اليمنى: Branding (اللوجو + العنوان)
+        # الجهة اليمنى: Branding
         outer.addWidget(self._build_brand_side(), 5)
 
         # الجهة اليسرى: نموذج الدخول
@@ -89,64 +162,70 @@ class LoginPage(QWidget):
         brand.setObjectName("brandSide")
         brand.setStyleSheet(f"""
             QFrame#brandSide {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {NAVY},
-                    stop:0.5 {NAVY_2},
-                    stop:1 {NAVY_3});
+                background:{PRIMARY};
                 border:none;
             }}
         """)
 
         layout = QVBoxLayout(brand)
         layout.setContentsMargins(60, 60, 60, 60)
-        layout.setSpacing(24)
+        layout.setSpacing(20)
         layout.setAlignment(Qt.AlignCenter)
 
         # Logo container
         logo_container = QFrame()
-        logo_container.setFixedSize(220, 220)
-        logo_container.setStyleSheet("""
-            QFrame {
-                background: rgba(255,255,255,0.06);
-                border: 2px solid rgba(255,255,255,0.12);
-                border-radius: 30px;
-            }
+        logo_container.setFixedSize(180, 180)
+        logo_container.setStyleSheet(f"""
+            QFrame {{
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.18);
+                border-radius: {RADIUS};
+            }}
         """)
-        apply_shadow(logo_container, blur=40, y_offset=10, alpha=60)
 
         logo_layout = QVBoxLayout(logo_container)
-        logo_layout.setContentsMargins(24, 24, 24, 24)
+        logo_layout.setContentsMargins(20, 20, 20, 20)
         logo_layout.setAlignment(Qt.AlignCenter)
 
         logo_label = QLabel()
         logo_label.setAlignment(Qt.AlignCenter)
-        logo_label.setStyleSheet("background:transparent;")
+        logo_label.setStyleSheet("background:transparent; border:none;")
 
-        # ✅ تحميل اللوجو من الملف
+        # تحميل اللوجو من الملف
         try:
             pix = QPixmap("logo.png")
             if not pix.isNull():
                 scaled = pix.scaled(
-                    170, 170,
+                    140, 140,
                     Qt.KeepAspectRatio,
                     Qt.SmoothTransformation
                 )
                 logo_label.setPixmap(scaled)
             else:
-                logo_label.setText("⏱")
-                logo_label.setStyleSheet(
-                    "font-size:80px; background:transparent; color:white;"
-                )
+                logo_label.setText("HR")
+                logo_label.setStyleSheet(f"""
+                    font-size:52px;
+                    background:transparent;
+                    color:white;
+                    font-weight:700;
+                    font-family:{FONT_FAMILY};
+                    border:none;
+                """)
         except Exception:
-            logo_label.setText("⏱")
-            logo_label.setStyleSheet(
-                "font-size:80px; background:transparent; color:white;"
-            )
+            logo_label.setText("HR")
+            logo_label.setStyleSheet(f"""
+                font-size:52px;
+                background:transparent;
+                color:white;
+                font-weight:700;
+                font-family:{FONT_FAMILY};
+                border:none;
+            """)
 
         logo_layout.addWidget(logo_label)
         layout.addWidget(logo_container, 0, Qt.AlignCenter)
 
-        layout.addSpacing(20)
+        layout.addSpacing(24)
 
         # العنوان الرئيسي
         brand_title = QLabel("نظام الحضور والانصراف")
@@ -154,95 +233,111 @@ class LoginPage(QWidget):
         brand_title.setStyleSheet(f"""
             QLabel {{
                 color:white;
-                font-size:32px;
-                font-weight:900;
+                font-size:26px;
+                font-weight:700;
                 background:transparent;
                 font-family:{FONT_FAMILY};
-                letter-spacing:0.5px;
+                border:none;
             }}
         """)
         layout.addWidget(brand_title)
 
         # خط فاصل صغير
         line = QFrame()
-        line.setFixedHeight(3)
-        line.setFixedWidth(80)
-        line.setStyleSheet(f"""
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 {PRIMARY}, stop:1 #60a5fa);
-            border-radius:2px;
+        line.setFixedHeight(2)
+        line.setFixedWidth(48)
+        line.setStyleSheet("""
+            background: rgba(255,255,255,0.45);
+            border:none;
         """)
         layout.addWidget(line, 0, Qt.AlignCenter)
 
         # العنوان الفرعي
         brand_sub = QLabel("إدارة احترافية للحضور والانصراف والمرتبات")
         brand_sub.setAlignment(Qt.AlignCenter)
-        brand_sub.setStyleSheet("""
-            QLabel {
-                color:#94a8c4;
-                font-size:14px;
+        brand_sub.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255,255,255,0.78);
+                font-size:13px;
                 background:transparent;
                 font-weight:500;
-                letter-spacing:0.3px;
-            }
+                font-family:{FONT_FAMILY};
+                border:none;
+            }}
         """)
         layout.addWidget(brand_sub)
 
-        layout.addSpacing(30)
+        layout.addSpacing(32)
 
-        # شارات الميزات
-        features = QHBoxLayout()
-        features.setSpacing(14)
-        features.setAlignment(Qt.AlignCenter)
-
-        feat_items = [
-            ("🕐", "تتبع البصمة"),
-            ("💰", "حساب المرتبات"),
-            ("📊", "تقارير شاملة"),
+        # قائمة الميزات — أرقام + نص (بدون أيقونات)
+        features_items = [
+            ("01", "تتبع البصمة والحضور"),
+            ("02", "حساب المرتبات والخصومات"),
+            ("03", "تقارير شاملة ودقيقة"),
         ]
 
-        for icon, text in feat_items:
-            box = QFrame()
-            box.setStyleSheet("""
-                QFrame {
-                    background: rgba(255,255,255,0.05);
-                    border: 1px solid rgba(255,255,255,0.1);
-                    border-radius: 12px;
-                }
+        features_box = QVBoxLayout()
+        features_box.setSpacing(8)
+
+        for num, text in features_items:
+            row = QFrame()
+            row.setStyleSheet(f"""
+                QFrame {{
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.14);
+                    border-radius: {RADIUS};
+                }}
             """)
-            bl = QVBoxLayout(box)
-            bl.setContentsMargins(16, 12, 16, 12)
-            bl.setSpacing(4)
-            bl.setAlignment(Qt.AlignCenter)
+            rh = QHBoxLayout(row)
+            rh.setContentsMargins(14, 10, 14, 10)
+            rh.setSpacing(14)
 
-            ic = QLabel(icon)
-            ic.setAlignment(Qt.AlignCenter)
-            ic.setStyleSheet("font-size:22px; background:transparent;")
-            bl.addWidget(ic)
-
-            lbl = QLabel(text)
-            lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("""
-                color:#dbeafe;
-                font-size:11px;
-                background:transparent;
-                font-weight:600;
+            num_lbl = QLabel(num)
+            num_lbl.setFixedSize(30, 30)
+            num_lbl.setAlignment(Qt.AlignCenter)
+            num_lbl.setStyleSheet(f"""
+                QLabel {{
+                    background: rgba(255,255,255,0.14);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.22);
+                    border-radius: {RADIUS};
+                    font-size: 11.5px;
+                    font-weight: 700;
+                    font-family:{FONT_FAMILY};
+                }}
             """)
-            bl.addWidget(lbl)
+            rh.addWidget(num_lbl)
 
-            features.addWidget(box)
+            txt_lbl = QLabel(text)
+            txt_lbl.setStyleSheet(f"""
+                QLabel {{
+                    color: rgba(255,255,255,0.92);
+                    font-size: 12.5px;
+                    font-weight: 600;
+                    background: transparent;
+                    font-family:{FONT_FAMILY};
+                    border:none;
+                }}
+            """)
+            rh.addWidget(txt_lbl)
+            rh.addStretch()
 
-        layout.addLayout(features)
+            features_box.addWidget(row)
+
+        layout.addLayout(features_box)
         layout.addStretch()
 
         # Footer
-        footer = QLabel("© 2026 · جميع الحقوق محفوظة")
+        footer = QLabel("جميع الحقوق محفوظة - 2026")
         footer.setAlignment(Qt.AlignCenter)
-        footer.setStyleSheet("""
-            color:#64748b;
-            font-size:10px;
-            background:transparent;
-            letter-spacing:0.5px;
+        footer.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255,255,255,0.5);
+                font-size: 11px;
+                background: transparent;
+                font-family:{FONT_FAMILY};
+                border:none;
+            }}
         """)
         layout.addWidget(footer)
 
@@ -268,18 +363,17 @@ class LoginPage(QWidget):
         # البطاقة الرئيسية
         card = QFrame()
         card.setObjectName("loginCard")
-        card.setFixedWidth(440)
+        card.setFixedWidth(420)
         card.setStyleSheet(f"""
             QFrame#loginCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:20px;
+                border-radius:{RADIUS};
             }}
         """)
-        apply_shadow(card, blur=40, y_offset=12, alpha=30)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(40, 40, 40, 40)
+        card_layout.setContentsMargins(36, 36, 36, 36)
         card_layout.setSpacing(0)
 
         # Stack للتبديل بين الدخول والتسجيل
@@ -307,8 +401,8 @@ class LoginPage(QWidget):
 
         title = QLabel("تسجيل الدخول")
         title.setStyleSheet(f"""
-            font-size:26px;
-            font-weight:900;
+            font-size:22px;
+            font-weight:700;
             color:{TEXT};
             background:transparent;
             font-family:{FONT_FAMILY};
@@ -317,100 +411,55 @@ class LoginPage(QWidget):
 
         sub = QLabel("مرحباً بك مجدداً — أدخل بياناتك للمتابعة")
         sub.setStyleSheet(f"""
-            font-size:12.5px;
+            font-size:12px;
             color:{TEXT_MUTED};
             background:transparent;
+            font-family:{FONT_FAMILY};
         """)
         head.addWidget(sub)
 
         v.addLayout(head)
-        v.addSpacing(28)
+        v.addSpacing(24)
 
         # حقل اسم المستخدم
         v.addWidget(self._field_label("اسم المستخدم"))
-        self.login_user = self._input_with_icon("👤", "أدخل اسم المستخدم")
+        v.addSpacing(6)
+        self.login_user = self._input_field("أدخل اسم المستخدم")
         v.addWidget(self.login_user)
 
-        v.addSpacing(16)
+        v.addSpacing(14)
 
         # حقل كلمة المرور
         v.addWidget(self._field_label("كلمة المرور"))
-        self.login_pass = self._input_with_icon(
-            "🔒", "أدخل كلمة المرور", password=True
-        )
+        v.addSpacing(6)
+        self.login_pass = self._input_field("أدخل كلمة المرور", password=True)
         v.addWidget(self.login_pass)
 
         v.addSpacing(12)
 
-        # خيارات (تذكرني)
+        # خيارات (تذكرني / نسيت كلمة المرور)
         options = QHBoxLayout()
         options.setSpacing(10)
 
         self.remember_cb = QCheckBox("تذكرني")
         self.remember_cb.setCursor(Qt.PointingHandCursor)
-        self.remember_cb.setStyleSheet(f"""
-            QCheckBox {{
-                font-size:11.5px;
-                color:{TEXT_SEC};
-                font-weight:600;
-                background:transparent;
-                spacing:7px;
-            }}
-            QCheckBox::indicator {{
-                width:16px;
-                height:16px;
-                border:1.5px solid {BORDER_2};
-                border-radius:5px;
-                background:white;
-            }}
-            QCheckBox::indicator:hover {{
-                border-color:{PRIMARY};
-            }}
-            QCheckBox::indicator:checked {{
-                background:{PRIMARY};
-                border-color:{PRIMARY};
-            }}
-        """)
+        self.remember_cb.setStyleSheet(self._checkbox_style())
         options.addWidget(self.remember_cb)
         options.addStretch()
 
-        forgot = QLabel("نسيت كلمة المرور؟")
-        forgot.setStyleSheet(f"""
-            font-size:11.5px;
-            color:{PRIMARY};
-            font-weight:700;
-            background:transparent;
-        """)
-        forgot.setCursor(Qt.PointingHandCursor)
-        options.addWidget(forgot)
+        btn_forgot = QPushButton("نسيت كلمة المرور؟")
+        btn_forgot.setCursor(Qt.PointingHandCursor)
+        btn_forgot.setStyleSheet(_link_btn_style(11.5))
+        options.addWidget(btn_forgot)
 
         v.addLayout(options)
-        v.addSpacing(24)
+        v.addSpacing(20)
 
         # زر الدخول
-        btn_login = QPushButton("🔓   تسجيل الدخول")
-        btn_login.setMinimumHeight(48)
+        btn_login = QPushButton("تسجيل الدخول")
+        btn_login.setMinimumHeight(40)
         btn_login.setCursor(Qt.PointingHandCursor)
-        btn_login.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_HOV});
-                color:white;
-                border:none;
-                border-radius:12px;
-                font-size:14px;
-                font-weight:900;
-                font-family:{FONT_FAMILY};
-                padding:0 20px;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3b82f6, stop:1 {PRIMARY_HOV});
-            }}
-            QPushButton:pressed {{
-                background:{PRIMARY_DK};
-            }}
-        """)
+        btn_login.setStyleSheet(_primary_btn_style(13))
         btn_login.clicked.connect(self._do_login)
         v.addWidget(btn_login)
 
@@ -419,10 +468,19 @@ class LoginPage(QWidget):
         # فاصل مع نص
         sep = QHBoxLayout()
         sep.setSpacing(10)
-        line1 = QFrame(); line1.setFixedHeight(1); line1.setStyleSheet(f"background:{BORDER};")
-        line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background:{BORDER};")
+        line1 = QFrame()
+        line1.setFixedHeight(1)
+        line1.setStyleSheet(f"background:{BORDER}; border:none;")
+        line2 = QFrame()
+        line2.setFixedHeight(1)
+        line2.setStyleSheet(f"background:{BORDER}; border:none;")
         sep_lbl = QLabel("ليس لديك حساب؟")
-        sep_lbl.setStyleSheet(f"font-size:11px; color:{TEXT_MUTED}; background:transparent;")
+        sep_lbl.setStyleSheet(f"""
+            font-size:11px;
+            color:{TEXT_MUTED};
+            background:transparent;
+            font-family:{FONT_FAMILY};
+        """)
         sep.addWidget(line1, 1)
         sep.addWidget(sep_lbl)
         sep.addWidget(line2, 1)
@@ -431,34 +489,16 @@ class LoginPage(QWidget):
         v.addSpacing(14)
 
         # زر إنشاء حساب
-        btn_go_register = QPushButton("✨   إنشاء حساب جديد")
-        btn_go_register.setMinimumHeight(46)
+        btn_go_register = QPushButton("إنشاء حساب جديد")
+        btn_go_register.setMinimumHeight(40)
         btn_go_register.setCursor(Qt.PointingHandCursor)
-        btn_go_register.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE};
-                color:{PRIMARY_DK};
-                border:1.5px solid {PRIMARY_BRD};
-                border-radius:12px;
-                font-size:13px;
-                font-weight:800;
-                font-family:{FONT_FAMILY};
-                padding:0 20px;
-            }}
-            QPushButton:hover {{
-                background:{PRIMARY_BG};
-                border-color:{PRIMARY};
-            }}
-            QPushButton:pressed {{
-                background:{PRIMARY_BRD};
-            }}
-        """)
+        btn_go_register.setStyleSheet(_secondary_btn_style(13))
         btn_go_register.clicked.connect(self._go_to_register)
         v.addWidget(btn_go_register)
 
         v.addStretch()
 
-        # ✅ الإصلاح: استخدم _line_edit للوصول لحقل الإدخال الفعلي
+        # ربط Enter
         self.login_pass._line_edit.returnPressed.connect(self._do_login)
         self.login_user._line_edit.returnPressed.connect(
             lambda: self.login_pass._line_edit.setFocus()
@@ -482,8 +522,8 @@ class LoginPage(QWidget):
 
         title = QLabel("إنشاء حساب جديد")
         title.setStyleSheet(f"""
-            font-size:24px;
-            font-weight:900;
+            font-size:22px;
+            font-weight:700;
             color:{TEXT};
             background:transparent;
             font-family:{FONT_FAMILY};
@@ -492,61 +532,45 @@ class LoginPage(QWidget):
 
         sub = QLabel("سجّل حسابك للبدء في استخدام النظام")
         sub.setStyleSheet(f"""
-            font-size:12.5px;
+            font-size:12px;
             color:{TEXT_MUTED};
             background:transparent;
+            font-family:{FONT_FAMILY};
         """)
         head.addWidget(sub)
 
         v.addLayout(head)
-        v.addSpacing(24)
+        v.addSpacing(22)
 
         # اسم المستخدم
         v.addWidget(self._field_label("اسم المستخدم"))
-        self.reg_user = self._input_with_icon("👤", "اختر اسم مستخدم")
+        v.addSpacing(6)
+        self.reg_user = self._input_field("اختر اسم مستخدم")
         v.addWidget(self.reg_user)
-        v.addSpacing(14)
+
+        v.addSpacing(12)
 
         # كلمة المرور
         v.addWidget(self._field_label("كلمة المرور"))
-        self.reg_pass = self._input_with_icon(
-            "🔒", "اختر كلمة مرور قوية", password=True
-        )
+        v.addSpacing(6)
+        self.reg_pass = self._input_field("اختر كلمة مرور قوية", password=True)
         v.addWidget(self.reg_pass)
-        v.addSpacing(14)
+
+        v.addSpacing(12)
 
         # تأكيد كلمة المرور
         v.addWidget(self._field_label("تأكيد كلمة المرور"))
-        self.reg_pass2 = self._input_with_icon(
-            "🔒", "أعد كتابة كلمة المرور", password=True
-        )
+        v.addSpacing(6)
+        self.reg_pass2 = self._input_field("أعد كتابة كلمة المرور", password=True)
         v.addWidget(self.reg_pass2)
-        v.addSpacing(22)
+
+        v.addSpacing(20)
 
         # زر التسجيل
-        btn_register = QPushButton("✅   إنشاء الحساب")
-        btn_register.setMinimumHeight(48)
+        btn_register = QPushButton("إنشاء الحساب")
+        btn_register.setMinimumHeight(40)
         btn_register.setCursor(Qt.PointingHandCursor)
-        btn_register.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
-                color:white;
-                border:none;
-                border-radius:12px;
-                font-size:14px;
-                font-weight:900;
-                font-family:{FONT_FAMILY};
-                padding:0 20px;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #10b981, stop:1 {SUCCESS_HOV});
-            }}
-            QPushButton:pressed {{
-                background:#065f46;
-            }}
-        """)
+        btn_register.setStyleSheet(_success_btn_style(13))
         btn_register.clicked.connect(self._do_register)
         v.addWidget(btn_register)
 
@@ -555,10 +579,19 @@ class LoginPage(QWidget):
         # فاصل
         sep = QHBoxLayout()
         sep.setSpacing(10)
-        line1 = QFrame(); line1.setFixedHeight(1); line1.setStyleSheet(f"background:{BORDER};")
-        line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background:{BORDER};")
+        line1 = QFrame()
+        line1.setFixedHeight(1)
+        line1.setStyleSheet(f"background:{BORDER}; border:none;")
+        line2 = QFrame()
+        line2.setFixedHeight(1)
+        line2.setStyleSheet(f"background:{BORDER}; border:none;")
         sep_lbl = QLabel("لديك حساب بالفعل؟")
-        sep_lbl.setStyleSheet(f"font-size:11px; color:{TEXT_MUTED}; background:transparent;")
+        sep_lbl.setStyleSheet(f"""
+            font-size:11px;
+            color:{TEXT_MUTED};
+            background:transparent;
+            font-family:{FONT_FAMILY};
+        """)
         sep.addWidget(line1, 1)
         sep.addWidget(sep_lbl)
         sep.addWidget(line2, 1)
@@ -567,32 +600,22 @@ class LoginPage(QWidget):
         v.addSpacing(14)
 
         # زر الرجوع
-        btn_back = QPushButton("←   العودة لتسجيل الدخول")
-        btn_back.setMinimumHeight(46)
+        btn_back = QPushButton("العودة لتسجيل الدخول")
+        btn_back.setMinimumHeight(40)
         btn_back.setCursor(Qt.PointingHandCursor)
-        btn_back.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE};
-                color:{TEXT_SEC};
-                border:1.5px solid {BORDER_2};
-                border-radius:12px;
-                font-size:13px;
-                font-weight:800;
-                font-family:{FONT_FAMILY};
-                padding:0 20px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-                color:{TEXT};
-            }}
-        """)
+        btn_back.setStyleSheet(_secondary_btn_style(13))
         btn_back.clicked.connect(self._go_to_login)
         v.addWidget(btn_back)
 
         v.addStretch()
 
-        # ✅ الإصلاح: استخدم _line_edit
+        # Enter ينتقل بين الحقول وينفّذ التسجيل
+        self.reg_user._line_edit.returnPressed.connect(
+            lambda: self.reg_pass._line_edit.setFocus()
+        )
+        self.reg_pass._line_edit.returnPressed.connect(
+            lambda: self.reg_pass2._line_edit.setFocus()
+        )
         self.reg_pass2._line_edit.returnPressed.connect(self._do_register)
 
         return w
@@ -602,48 +625,28 @@ class LoginPage(QWidget):
     # ========================================================
     def _field_label(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"""
-            font-size:11.5px;
-            font-weight:800;
-            color:{TEXT_SEC};
-            background:transparent;
-            font-family:{FONT_FAMILY};
-            letter-spacing:0.2px;
-            padding-bottom:2px;
-        """)
+        lbl.setStyleSheet(_field_label_style())
         return lbl
 
-    def _input_with_icon(self, icon, placeholder, password=False):
-        """حقل إدخال بأيقونة داخلية على اليمين (RTL)"""
+    def _input_field(self, placeholder, password=False):
+        """حقل إدخال نظيف، مع زر إظهار/إخفاء نصي لكلمة المرور."""
         wrapper = QFrame()
         wrapper.setObjectName("inputWrap")
-        wrapper.setFixedHeight(48)
+        wrapper.setFixedHeight(38)
         wrapper.setStyleSheet(f"""
             QFrame#inputWrap {{
-                background:{SURFACE_2};
-                border:1.5px solid {BORDER};
-                border-radius:11px;
+                background:{SURFACE};
+                border:1px solid {BORDER_2};
+                border-radius:{RADIUS};
             }}
             QFrame#inputWrap:hover {{
-                background:white;
-                border-color:{BORDER_2};
+                border-color:{TEXT_MUTED};
             }}
         """)
 
         h = QHBoxLayout(wrapper)
-        h.setContentsMargins(14, 0, 14, 0)
-        h.setSpacing(10)
-
-        # الأيقونة (يسار في RTL يعني تظهر على يمين الحقل بصريًا)
-        ic = QLabel(icon)
-        ic.setFixedSize(24, 24)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            font-size:15px;
-            background:transparent;
-            color:{TEXT_MUTED};
-        """)
-        h.addWidget(ic)
+        h.setContentsMargins(12, 0, 8, 0)
+        h.setSpacing(6)
 
         inp = QLineEdit()
         inp.setPlaceholderText(placeholder)
@@ -655,36 +658,39 @@ class LoginPage(QWidget):
                 background:transparent;
                 border:none;
                 padding:0;
-                font-size:13px;
+                font-size:12.5px;
                 color:{TEXT};
                 font-family:{FONT_FAMILY};
-            }}
-            QLineEdit::placeholder {{
-                color:{TEXT_MUTED};
             }}
         """)
         h.addWidget(inp, 1)
 
-        # زر إظهار/إخفاء كلمة المرور (فقط للحقول السرية)
+        # زر إظهار/إخفاء كلمة المرور (نصي، بدون أيقونات)
         if password:
-            toggle = QPushButton("👁")
-            toggle.setFixedSize(26, 26)
+            toggle = QPushButton("عرض")
+            toggle.setFixedHeight(24)
+            toggle.setMinimumWidth(46)
             toggle.setCursor(Qt.PointingHandCursor)
             toggle.setCheckable(True)
             toggle.setToolTip("إظهار / إخفاء كلمة المرور")
             toggle.setStyleSheet(f"""
                 QPushButton {{
                     background:transparent;
-                    border:none;
+                    border:1px solid {BORDER};
+                    border-radius:{RADIUS};
                     color:{TEXT_MUTED};
-                    font-size:14px;
-                    border-radius:6px;
+                    font-size:10.5px;
+                    font-weight:600;
+                    font-family:{FONT_FAMILY};
+                    padding:0 8px;
                 }}
                 QPushButton:hover {{
-                    background:{PRIMARY_BG};
+                    border-color:{PRIMARY};
                     color:{PRIMARY};
                 }}
                 QPushButton:checked {{
+                    background:{PRIMARY_BG};
+                    border-color:{PRIMARY_BRD};
                     color:{PRIMARY};
                 }}
             """)
@@ -692,17 +698,43 @@ class LoginPage(QWidget):
             def _toggle_password(checked, field=inp, btn=toggle):
                 if checked:
                     field.setEchoMode(QLineEdit.Normal)
-                    btn.setText("🙈")
+                    btn.setText("إخفاء")
                 else:
                     field.setEchoMode(QLineEdit.Password)
-                    btn.setText("👁")
+                    btn.setText("عرض")
 
             toggle.toggled.connect(_toggle_password)
             h.addWidget(toggle)
 
-        # تخزين مرجع الحقل الفعلي داخل wrapper
+        # تخزين مرجع الحقل الفعلي
         wrapper._line_edit = inp
         return wrapper
+
+    def _checkbox_style(self):
+        return f"""
+            QCheckBox {{
+                font-size:11.5px;
+                color:{TEXT_SEC};
+                font-weight:600;
+                background:transparent;
+                spacing:7px;
+                font-family:{FONT_FAMILY};
+            }}
+            QCheckBox::indicator {{
+                width:15px;
+                height:15px;
+                border:1px solid {BORDER_2};
+                border-radius:3px;
+                background:white;
+            }}
+            QCheckBox::indicator:hover {{
+                border-color:{PRIMARY};
+            }}
+            QCheckBox::indicator:checked {{
+                background:{PRIMARY};
+                border-color:{PRIMARY};
+            }}
+        """
 
     # ========================================================
     #                التنقل بين الفورم

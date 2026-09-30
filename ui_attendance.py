@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QPushButton, QMessageBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QDateEdit, QFrame, QGridLayout, QLineEdit,
     QFileDialog, QScrollArea, QDialog, QAbstractItemView,
-    QGraphicsDropShadowEffect, QSizePolicy, QTextEdit, QCheckBox
+    QSizePolicy, QTextEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, QDate, QRegularExpression
 from PySide6.QtGui import QColor, QFont, QRegularExpressionValidator
@@ -15,7 +15,7 @@ from PySide6.QtGui import QColor, QFont, QRegularExpressionValidator
 from database import (
     get_employees, get_employee, get_shift, get_shift_deductions,
     get_raw_punches_by_date, get_all_raw_punches_in_range,
-    add_raw_punches_bulk,
+    add_raw_punches_bulk, delete_all_raw_punches, count_raw_punches,
     get_attendance_override, save_attendance_override,
     delete_attendance_override, get_all_overrides_in_range,
     get_overrides_in_range,
@@ -25,70 +25,68 @@ from database import (
 
 
 # ============================================================
-#                نظام الألوان الاحترافي (Modern Pro)
+#     نظام ألوان مسطح وهادئ (تصميم برامج مكتبية / إدارية)
 # ============================================================
-BG          = "#f1f5f9"
-BG_2        = "#eef2f7"
+BG          = "#eef0f3"
 SURFACE     = "#ffffff"
-SURFACE_2   = "#f8fafc"
-SURFACE_3   = "#f1f5f9"
-BORDER      = "#e2e8f0"
-BORDER_2    = "#cbd5e1"
-DIVIDER     = "#eef2f7"
+SURFACE_2   = "#f8f9fa"
+SURFACE_3   = "#f1f3f5"
+BORDER      = "#d8dce1"
+BORDER_2    = "#c3c9d0"
+DIVIDER     = "#e8ebee"
 
-TEXT        = "#0f172a"
-TEXT_SEC    = "#475569"
-TEXT_MUTED  = "#94a3b8"
+TEXT        = "#1f2933"
+TEXT_SEC    = "#4b5563"
+TEXT_MUTED  = "#7b8794"
 
-NAVY        = "#0b1729"
-NAVY_2      = "#132a4a"
-NAVY_3      = "#1e3a5f"
-NAVY_ACCENT = "#1e40af"
+PRIMARY     = "#1f4e8c"
+PRIMARY_HOV = "#1a4275"
+PRIMARY_DK  = "#153561"
+PRIMARY_BG  = "#e8eff8"
+PRIMARY_BRD = "#b6c8e0"
 
-PRIMARY     = "#2563eb"
-PRIMARY_HOV = "#1d4ed8"
-PRIMARY_DK  = "#1e40af"
-PRIMARY_BG  = "#eff6ff"
-PRIMARY_BRD = "#bfdbfe"
+SUCCESS     = "#2f7d4f"
+SUCCESS_HOV = "#276a43"
+SUCCESS_BG  = "#eaf4ee"
+SUCCESS_BRD = "#b9d9c5"
 
-SUCCESS     = "#059669"
-SUCCESS_HOV = "#047857"
-SUCCESS_BG  = "#ecfdf5"
-SUCCESS_BRD = "#a7f3d0"
+DANGER      = "#b3372f"
+DANGER_HOV  = "#992d26"
+DANGER_BG   = "#fbeceb"
+DANGER_BRD  = "#e6b9b5"
 
-DANGER      = "#dc2626"
-DANGER_HOV  = "#b91c1c"
-DANGER_BG   = "#fef2f2"
-DANGER_BRD  = "#fecaca"
+WARNING     = "#a86a12"
+WARNING_HOV = "#8f590d"
+WARNING_BG  = "#fbf3e4"
+WARNING_BRD = "#e6cf9f"
 
-WARNING     = "#d97706"
-WARNING_HOV = "#b45309"
-WARNING_BG  = "#fffbeb"
-WARNING_BRD = "#fde68a"
+INFO        = "#2a6f8f"
+INFO_BG     = "#e9f2f6"
+INFO_BRD    = "#b5d2df"
 
-INFO        = "#0891b2"
-INFO_BG     = "#ecfeff"
-INFO_BRD    = "#a5f3fc"
+PURPLE      = "#5f4b8b"
+PURPLE_BG   = "#efecf5"
+PURPLE_BRD  = "#cfc6e0"
 
-PURPLE      = "#7c3aed"
-PURPLE_BG   = "#f5f3ff"
-PURPLE_BRD  = "#ddd6fe"
+PINK        = "#9a3f62"
+PINK_BG     = "#f7ecf0"
+PINK_BRD    = "#e2bfcd"
 
-PINK        = "#db2777"
-PINK_BG     = "#fdf2f8"
-PINK_BRD    = "#fbcfe8"
+GRAY        = "#616e7c"
+GRAY_BG     = "#f0f2f4"
+GRAY_BRD    = "#d8dce1"
 
-GRAY        = "#64748b"
-GRAY_BG     = "#f1f5f9"
-GRAY_BRD    = "#cbd5e1"
-
-ROW_ALT     = "#fafbfc"
-HEADER_BG   = "#f8fafc"
+ROW_ALT     = "#f8f9fa"
+HEADER_BG   = "#f1f3f5"
 
 FONT_FAMILY = "Segoe UI, Tahoma, Arial, sans-serif"
 
+RADIUS = "4px"
+
 ARABIC_DAYS = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]
 PY_WD_TO_AR = {5: 0, 6: 1, 0: 2, 1: 3, 2: 4, 3: 5, 4: 6}
+
+OVERTIME_CUTOFF = "02:00"
 
 DAY_STATUS_LABELS = {
     "auto":         "تلقائي",
@@ -113,13 +111,22 @@ SICK_POLICY_VALUES = {
     "full": 1.0,
 }
 
+# (النص، اللون، الخلفية، الحد، رمز) — الرمز فارغ عمداً (بدون أيقونات)
 STATUS_STYLE = {
-    "present":      ("حاضر",         SUCCESS, SUCCESS_BG, SUCCESS_BRD, "✅"),
-    "absent":       ("غائب",         DANGER,  DANGER_BG,  DANGER_BRD,  "❌"),
-    "annual_leave": ("إجازة سنوية",  INFO,    INFO_BG,    INFO_BRD,    "🌴"),
-    "sick_leave":   ("إجازة مرضية",  WARNING, WARNING_BG, WARNING_BRD, "💊"),
-    "work_injury":  ("إصابة عمل",    PINK,    PINK_BG,    PINK_BRD,    "🩹"),
-    "weekly_holiday": ("راحة أسبوعية", GRAY, GRAY_BG, GRAY_BRD, "🌙"),
+    "present":      ("حاضر",         SUCCESS, SUCCESS_BG, SUCCESS_BRD, ""),
+    "absent":       ("غائب",         DANGER,  DANGER_BG,  DANGER_BRD,  ""),
+    "annual_leave": ("إجازة سنوية",  INFO,    INFO_BG,    INFO_BRD,    ""),
+    "sick_leave":   ("إجازة مرضية",  WARNING, WARNING_BG, WARNING_BRD, ""),
+    "work_injury":  ("إصابة عمل",    PINK,    PINK_BG,    PINK_BRD,    ""),
+    "weekly_holiday": ("راحة أسبوعية", GRAY, GRAY_BG, GRAY_BRD, ""),
+}
+
+NOTE_KINDS = {
+    "info":    (INFO,    INFO_BG,    INFO_BRD),
+    "success": (SUCCESS, SUCCESS_BG, SUCCESS_BRD),
+    "danger":  (DANGER,  DANGER_BG,  DANGER_BRD),
+    "warning": (WARNING, WARNING_BG, WARNING_BRD),
+    "pink":    (PINK,    PINK_BG,    PINK_BRD),
 }
 
 
@@ -131,14 +138,123 @@ def _fmt_num(v):
     return f"{fv:.0f}" if fv == int(fv) else f"{fv:.1f}"
 
 
-def apply_shadow(widget, blur=18, y_offset=2, alpha=20):
-    effect = QGraphicsDropShadowEffect(widget)
-    effect.setBlurRadius(blur)
-    effect.setXOffset(0)
-    effect.setYOffset(y_offset)
-    effect.setColor(QColor(15, 23, 42, alpha))
-    widget.setGraphicsEffect(effect)
-    return effect
+def _badge_style(color, bg, brd, size=11, pad="3px 10px"):
+    return f"""
+        QLabel {{
+            background:{bg}; color:{color};
+            border:1px solid {brd}; padding:{pad};
+            border-radius:3px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+    """
+
+
+def _card_style(object_name):
+    return f"""
+        QFrame#{object_name} {{
+            background:{SURFACE};
+            border:1px solid {BORDER};
+            border-radius:{RADIUS};
+        }}
+    """
+
+
+def _table_style(item_padding="8px 8px"):
+    return f"""
+        QTableWidget {{
+            background:{SURFACE}; border:none; color:{TEXT};
+            font-size:12px; outline:none;
+            selection-background-color:{PRIMARY_BG};
+            selection-color:{TEXT}; gridline-color:{DIVIDER};
+            font-family:{FONT_FAMILY};
+            alternate-background-color:{ROW_ALT};
+        }}
+        QTableWidget::item {{
+            padding:{item_padding}; border-bottom:1px solid {DIVIDER};
+        }}
+        QTableWidget::item:selected {{
+            background:{PRIMARY_BG}; color:{TEXT};
+        }}
+        QHeaderView::section {{
+            background:{HEADER_BG}; color:{TEXT_SEC};
+            padding:10px 8px; border:none;
+            border-bottom:1px solid {BORDER_2};
+            border-left:1px solid {DIVIDER};
+            font-weight:700; font-size:11px;
+            font-family:{FONT_FAMILY};
+        }}
+        QScrollBar:vertical {{
+            width:10px; background:{SURFACE_3};
+            margin:0;
+        }}
+        QScrollBar::handle:vertical {{
+            background:{BORDER_2}; border-radius:2px; min-height:40px;
+            margin:2px;
+        }}
+        QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {{ height:0; }}
+        QScrollBar:horizontal {{
+            height:10px; background:{SURFACE_3}; margin:0;
+        }}
+        QScrollBar::handle:horizontal {{
+            background:{BORDER_2}; border-radius:2px; min-width:40px;
+            margin:2px;
+        }}
+        QScrollBar::add-line:horizontal,
+        QScrollBar::sub-line:horizontal {{ width:0; }}
+    """
+
+
+def _primary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{PRIMARY}; color:white;
+            border:1px solid {PRIMARY}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{PRIMARY_HOV}; border-color:{PRIMARY_HOV}; }}
+        QPushButton:pressed {{ background:{PRIMARY_DK}; border-color:{PRIMARY_DK}; }}
+    """
+
+
+def _secondary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{TEXT};
+            border:1px solid {BORDER_2}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SURFACE_3}; border-color:{TEXT_MUTED}; }}
+        QPushButton:pressed {{ background:{DIVIDER}; }}
+    """
+
+
+def _danger_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{DANGER};
+            border:1px solid {DANGER_BRD}; border-radius:{RADIUS};
+            padding:0 16px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{DANGER_BG}; border-color:{DANGER}; }}
+        QPushButton:pressed {{ background:#f5d9d6; }}
+    """
+
+
+def _row_btn_style(size=11):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{PRIMARY};
+            border:1px solid {PRIMARY_BRD}; border-radius:{RADIUS};
+            padding:0 12px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{PRIMARY_BG}; border-color:{PRIMARY}; }}
+    """
 
 
 # ============================================================
@@ -163,6 +279,15 @@ def datetime_to_minutes(dt_str: str) -> int:
         return int(parts[0]) * 60 + int(parts[1])
     except (ValueError, IndexError):
         return 0
+
+
+def _parse_full_datetime(s: str):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return None
 
 
 def format_time_only(dt_str: str) -> str:
@@ -218,6 +343,41 @@ def parse_datetime_flexible(s: str):
         except ValueError:
             continue
     return None
+
+
+# ============================================================
+#   Helpers: جمع بصمات يوم عمل (يشمل فجر اليوم التالي)
+# ============================================================
+def _combine_punches_for_day(punches_by_emp_date, employee_id, date_str,
+                             cutoff=OVERTIME_CUTOFF):
+    cutoff_min = time_to_minutes(cutoff)
+    by_date = punches_by_emp_date.get(employee_id, {})
+
+    today_all = by_date.get(date_str, [])
+    next_date = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    next_all = by_date.get(next_date, [])
+
+    today_ok = [p for p in today_all if datetime_to_minutes(p["punch_time"]) > cutoff_min]
+    next_ok = [p for p in next_all if datetime_to_minutes(p["punch_time"]) <= cutoff_min]
+
+    return sorted(today_ok + next_ok, key=lambda x: x["punch_time"])
+
+
+def get_punches_for_day(employee_id, date_str, cutoff=OVERTIME_CUTOFF):
+    cutoff_min = time_to_minutes(cutoff)
+
+    today_punches = [
+        p for p in get_raw_punches_by_date(employee_id, date_str)
+        if datetime_to_minutes(p["punch_time"]) > cutoff_min
+    ]
+
+    next_date = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    next_punches = [
+        p for p in get_raw_punches_by_date(employee_id, next_date)
+        if datetime_to_minutes(p["punch_time"]) <= cutoff_min
+    ]
+
+    return sorted(today_punches + next_punches, key=lambda x: x["punch_time"])
 
 
 # ============================================================
@@ -376,7 +536,6 @@ def compute_deduction_for_checkin(check_in_min: int, rules):
 
 
 def compute_deduction_for_checkout(check_out_min: int, rules):
-    """تطبيق نفس قواعد الخصم على وقت الانصراف (للانصراف المبكر)."""
     for rule in rules:
         from_min = time_to_minutes(rule["from_time"])
         to_min = time_to_minutes(rule["to_time"])
@@ -405,12 +564,12 @@ def compute_day_stats(employee, shift, punches, override=None, is_working_day=Tr
         "check_in": None,
         "check_out": None,
         "delay_min": 0,
-        "early_leave_min": 0,          # ✅ جديد: دقائق الانصراف المبكر
+        "early_leave_min": 0,
         "overtime_min": 0,
         "deduction_label": "—",
         "deduction_minutes": 0,
-        "early_leave_deduction_label": "—",   # ✅ جديد: خصم من قواعد الانصراف
-        "early_leave_deduction_minutes": 0,   # ✅ جديد
+        "early_leave_deduction_label": "—",
+        "early_leave_deduction_minutes": 0,
         "annual_leave_deduction": 0.0,
         "sick_leave_deduction": 0.0,
         "notes": "",
@@ -442,7 +601,6 @@ def compute_day_stats(employee, shift, punches, override=None, is_working_day=Tr
             result["day_type"] = "weekly_holiday"
         return result
 
-    # ------- حساب الأوقات (يشمل الآن الانصراف المبكر) -------
     def _calc_times(ci, co):
         delay = 0
         overtime = 0
@@ -455,29 +613,49 @@ def compute_day_stats(employee, shift, punches, override=None, is_working_day=Tr
         shift_start = time_to_minutes(shift["start_time"])
         shift_end = time_to_minutes(shift["end_time"])
 
-        # ✅ إصلاح: لو الشيفت مسائي ونهايته بعد منتصف الليل
         if shift["shift_type"] == "evening" and shift_end <= shift_start:
             shift_end += 24 * 60
 
         rules = get_shift_deductions(shift["id"])
 
+        ref_date = None
+        ci_min = 0
+        co_min = 0
+
         if ci:
-            ci_min = datetime_to_minutes(ci)
+            ci_dt = _parse_full_datetime(ci)
+            if ci_dt is not None:
+                ref_date = ci_dt.date()
+                base = datetime.combine(ref_date, datetime.min.time())
+                ci_min = int((ci_dt - base).total_seconds() // 60)
+            else:
+                ci_min = datetime_to_minutes(ci)
+
             delay = max(0, ci_min - shift_start)
             dl, dm = compute_deduction_for_checkin(ci_min, rules)
             ded_label = dl
             ded_min = dm
 
         if co:
-            co_min = datetime_to_minutes(co)
-            # ✅ إصلاح: لو الشيفت مسائي ووقت الخروج قبل وقت البداية → أضف 24 ساعة
-            if shift["shift_type"] == "evening" and co_min < shift_start:
-                co_min += 24 * 60
+            co_dt = _parse_full_datetime(co)
+            if co_dt is not None:
+                if ref_date is None:
+                    ref_date = co_dt.date()
+                base = datetime.combine(ref_date, datetime.min.time())
+                co_min = int((co_dt - base).total_seconds() // 60)
+            else:
+                co_min = datetime_to_minutes(co)
+                if shift["shift_type"] == "evening" and co_min < shift_start:
+                    co_min += 24 * 60
 
             overtime = max(0, co_min - shift_end)
-            early_leave = max(0, shift_end - co_min)   # ✅ جديد
+            early_leave = max(0, shift_end - co_min)
 
-            # ✅ تطبيق قواعد الخصم على وقت الخروج (لو فيه قاعدة تنطبق)
+            cutoff_min = time_to_minutes(OVERTIME_CUTOFF)
+            cutoff_abs = cutoff_min + 24 * 60
+            if co_min > cutoff_abs:
+                overtime = max(0, cutoff_abs - shift_end)
+
             if early_leave > 0:
                 edl, edm = compute_deduction_for_checkout(co_min, rules)
                 if edl != "—":
@@ -625,9 +803,9 @@ def compute_employee_summary(employee_id, from_date, to_date,
     weekly_holidays = 0
     total_delay = 0
     total_overtime = 0
-    total_early_leave = 0                     # ✅ جديد
+    total_early_leave = 0
     total_ded_minutes = 0
-    total_early_leave_rule_minutes = 0        # ✅ جديد: خصم القواعد
+    total_early_leave_rule_minutes = 0
     ded_full = 0
     ded_half = 0
     ded_quarter = 0
@@ -652,9 +830,9 @@ def compute_employee_summary(employee_id, from_date, to_date,
         total_working += 1
 
         if punches_by_emp_date is not None:
-            punches = punches_by_emp_date.get(employee_id, {}).get(date_str, [])
+            punches = _combine_punches_for_day(punches_by_emp_date, employee_id, date_str)
         else:
-            punches = get_raw_punches_by_date(employee_id, date_str)
+            punches = get_punches_for_day(employee_id, date_str)
 
         stats = compute_day_stats(emp, shift, punches, override=override, is_working_day=True)
         status = stats["status"]
@@ -664,8 +842,8 @@ def compute_employee_summary(employee_id, from_date, to_date,
             total_delay += stats["delay_min"]
             total_overtime += stats["overtime_min"]
             total_ded_minutes += stats["deduction_minutes"]
-            total_early_leave += stats.get("early_leave_min", 0)   # ✅ جديد
-            total_early_leave_rule_minutes += stats.get("early_leave_deduction_minutes", 0)  # ✅ جديد
+            total_early_leave += stats.get("early_leave_min", 0)
+            total_early_leave_rule_minutes += stats.get("early_leave_deduction_minutes", 0)
 
             if stats["deduction_label"] == "يوم كامل":
                 ded_full += 1
@@ -674,7 +852,6 @@ def compute_employee_summary(employee_id, from_date, to_date,
             elif stats["deduction_label"] == "ربع يوم":
                 ded_quarter += 1
 
-            # ✅ خصومات الانصراف المبكر لو من القواعد
             if stats.get("early_leave_deduction_label") == "يوم كامل":
                 ded_full += 1
             elif stats.get("early_leave_deduction_label") == "نص يوم":
@@ -706,7 +883,6 @@ def compute_employee_summary(employee_id, from_date, to_date,
     if total_early_leave_rule_minutes:
         ded_parts.append(f"{total_early_leave_rule_minutes} دقيقة انصراف")
     if total_early_leave:
-        # ✅ إظهار الانصراف المبكر بالدقائق حتى لو لم تُطبق عليه قاعدة
         ded_parts.append(f"انصراف مبكر: {total_early_leave} د")
     if total_sick_deduction:
         ded_parts.append(f"مرضية: {_fmt_num(total_sick_deduction)} يوم")
@@ -734,11 +910,11 @@ def compute_employee_summary(employee_id, from_date, to_date,
         "weekly_holidays": weekly_holidays,
         "leave": annual_leaves + sick_leaves,
         "delay_str": format_minutes_ar(total_delay),
-        "early_leave_str": format_minutes_ar(total_early_leave),   # ✅ جديد
+        "early_leave_str": format_minutes_ar(total_early_leave),
         "overtime_str": format_overtime_ar(total_overtime),
         "deduction_str": ded_str,
         "_total_delay_min": total_delay,
-        "_total_early_leave_min": total_early_leave,               # ✅ جديد
+        "_total_early_leave_min": total_early_leave,
         "_total_overtime_min": total_overtime,
         "_total_sick_deduction": total_sick_deduction,
     }
@@ -774,8 +950,8 @@ class AttendancePage(QWidget):
         body.setObjectName("attendanceBody")
         body.setStyleSheet(f"QWidget#attendanceBody {{ background:{BG}; }}")
         body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(26, 22, 26, 26)
-        body_layout.setSpacing(18)
+        body_layout.setContentsMargins(24, 20, 24, 24)
+        body_layout.setSpacing(16)
 
         body_layout.addWidget(self._build_stats())
         body_layout.addWidget(self._build_filters_card())
@@ -785,51 +961,34 @@ class AttendancePage(QWidget):
     def _build_topbar(self):
         bar = QFrame()
         bar.setObjectName("attendanceTopbar")
-        bar.setFixedHeight(96)
+        bar.setFixedHeight(60)
         bar.setStyleSheet(f"""
             QFrame#attendanceTopbar {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
+                background:{SURFACE};
                 border:none;
-                border-bottom:1px solid #1e3a5f;
+                border-bottom:1px solid {BORDER};
             }}
         """)
 
         h = QHBoxLayout(bar)
-        h.setContentsMargins(30, 0, 30, 0)
-        h.setSpacing(18)
-
-        icon = QLabel("📊")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(54, 54)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:15px;
-                font-size:24px;
-            }}
-        """)
-        apply_shadow(icon, blur=14, y_offset=2, alpha=60)
-        h.addWidget(icon)
+        h.setContentsMargins(24, 0, 24, 0)
+        h.setSpacing(14)
 
         title_box = QVBoxLayout()
-        title_box.setSpacing(4)
+        title_box.setSpacing(2)
 
-        title = QLabel("تسجيل الحضور والانصراف")
+        title = QLabel("الحضور والانصراف")
         title.setStyleSheet(f"""
             QLabel {{
-                color:white; font-size:22px; font-weight:900;
+                color:{TEXT}; font-size:16px; font-weight:700;
                 background:transparent; font-family:{FONT_FAMILY};
-                letter-spacing:0.3px;
             }}
         """)
         title_box.addWidget(title)
 
-        subtitle = QLabel("متابعة البصمات، التأخير، الانصراف المبكر، الإضافي، الإجازات، والخصومات")
+        subtitle = QLabel("متابعة البصمات والتأخير والإضافي والخصومات")
         subtitle.setStyleSheet(
-            "QLabel { color:#94a8c4; font-size:11px; background:transparent; }"
+            f"QLabel {{ color:{TEXT_MUTED}; font-size:11px; background:transparent; }}"
         )
         title_box.addWidget(subtitle)
         h.addLayout(title_box)
@@ -837,15 +996,15 @@ class AttendancePage(QWidget):
 
         self.punch_count_label = QLabel("0 بصمة")
         self.punch_count_label.setAlignment(Qt.AlignCenter)
-        self.punch_count_label.setMinimumWidth(120)
-        self.punch_count_label.setFixedHeight(38)
+        self.punch_count_label.setMinimumWidth(100)
+        self.punch_count_label.setFixedHeight(28)
         self.punch_count_label.setStyleSheet(f"""
             QLabel {{
-                background: rgba(59, 91, 253, 0.15);
-                color:#c7d2fe;
-                border:1px solid rgba(59, 91, 253, 0.35);
-                border-radius:19px; padding:0 18px;
-                font-size:11.5px; font-weight:800;
+                background:{SURFACE_3};
+                color:{TEXT_SEC};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS}; padding:0 14px;
+                font-size:11.5px; font-weight:600;
             }}
         """)
         h.addWidget(self.punch_count_label)
@@ -856,19 +1015,14 @@ class AttendancePage(QWidget):
         wrap.setStyleSheet("background:transparent;")
         grid = QGridLayout(wrap)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(14)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
 
-        self.stat_employees = self._stat_card("إجمالي الموظفين", "0", "👥",
-                                              PRIMARY, PRIMARY_BG, PRIMARY_BRD)
-        self.stat_present = self._stat_card("أيام الحضور", "0", "✓",
-                                            SUCCESS, SUCCESS_BG, SUCCESS_BRD)
-        self.stat_delay = self._stat_card("إجمالي التأخير", "—", "⏱",
-                                          WARNING, WARNING_BG, WARNING_BRD)
-        self.stat_early = self._stat_card("إجمالي الانصراف المبكر", "—", "⏳",
-                                          PINK, PINK_BG, PINK_BRD)          # ✅ جديد
-        self.stat_overtime = self._stat_card("إجمالي الإضافي", "—", "➕",
-                                             PURPLE, PURPLE_BG, PURPLE_BRD)
+        self.stat_employees = self._stat_card("إجمالي الموظفين", "0", TEXT)
+        self.stat_present = self._stat_card("أيام الحضور", "0", SUCCESS)
+        self.stat_delay = self._stat_card("إجمالي التأخير", "—", WARNING)
+        self.stat_early = self._stat_card("الانصراف المبكر", "—", PINK)
+        self.stat_overtime = self._stat_card("إجمالي الإضافي", "—", PURPLE)
 
         grid.addWidget(self.stat_employees, 0, 0)
         grid.addWidget(self.stat_present, 0, 1)
@@ -880,117 +1034,69 @@ class AttendancePage(QWidget):
             grid.setColumnStretch(col, 1)
         return wrap
 
-    def _stat_card(self, title, value, icon_text, color, soft, border_color):
+    def _stat_card(self, title, value, color):
         card = QFrame()
         card.setObjectName("statCard")
-        card.setMinimumHeight(96)
-        card.setStyleSheet(f"""
-            QFrame#statCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-            QFrame#statCard:hover {{
-                border:1.5px solid {border_color};
-            }}
-        """)
-        apply_shadow(card, blur=16, y_offset=3, alpha=25)
+        card.setMinimumHeight(74)
+        card.setStyleSheet(_card_style("statCard"))
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(18, 14, 18, 14)
-        h.setSpacing(14)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(4)
 
-        ic = QLabel(icon_text)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(52, 52)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{soft}; color:{color};
-                border:1.5px solid {border_color};
-                border-radius:14px; font-size:22px; font-weight:900;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
-        v.setSpacing(2)
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:800; "
-            f"background:transparent; letter-spacing:0.3px;"
+            f"font-size:11px; color:{TEXT_MUTED}; font-weight:600; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(lbl)
 
         val = QLabel(value)
         val.setStyleSheet(
-            f"font-size:24px; color:{TEXT}; font-weight:900; background:transparent;"
+            f"font-size:21px; color:{color}; font-weight:700; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(val)
 
-        h.addLayout(v)
-        h.addStretch()
         card._value_label = val
         return card
 
     def _build_filters_card(self):
         card = QFrame()
         card.setObjectName("filterCard")
-        card.setStyleSheet(f"""
-            QFrame#filterCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(card, blur=18, y_offset=3, alpha=22)
+        card.setStyleSheet(_card_style("filterCard"))
 
         outer = QVBoxLayout(card)
-        outer.setContentsMargins(22, 18, 22, 18)
-        outer.setSpacing(14)
-
-        head = QHBoxLayout()
-        head.setSpacing(10)
-
-        head_icon = QLabel("🔍")
-        head_icon.setFixedSize(34, 34)
-        head_icon.setAlignment(Qt.AlignCenter)
-        head_icon.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:9px; font-size:15px;
-            }}
-        """)
-        head.addWidget(head_icon)
+        outer.setContentsMargins(18, 14, 18, 14)
+        outer.setSpacing(12)
 
         head_title = QLabel("البحث والفلاتر")
         head_title.setStyleSheet(
-            f"font-size:13px; font-weight:900; color:{TEXT}; background:transparent;"
+            f"font-size:12.5px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; border:none;"
         )
-        head.addWidget(head_title)
-        head.addStretch()
-        outer.addLayout(head)
+        outer.addWidget(head_title)
 
         h = QHBoxLayout()
-        h.setSpacing(14)
+        h.setSpacing(12)
 
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("ابحث بالكود أو الاسم...")
-        self.code_input.setFixedHeight(44)
+        self.code_input.setFixedHeight(34)
         self.code_input.setLayoutDirection(Qt.LeftToRight)
         self.code_input.setAlignment(Qt.AlignLeft)
         self.code_input.setStyleSheet(self._input_style())
         self.code_input.returnPressed.connect(self._refresh_table)
 
         code_wrap = self._labeled("كود الموظف", self.code_input)
-        code_wrap.setMinimumWidth(200)
+        code_wrap.setMinimumWidth(180)
         h.addWidget(code_wrap, 2)
 
         self.from_date = QDateEdit()
         self.from_date.setCalendarPopup(True)
         self.from_date.setDisplayFormat("yyyy-MM-dd")
         self.from_date.setDate(QDate.currentDate().addDays(-30))
-        self.from_date.setFixedHeight(44)
+        self.from_date.setFixedHeight(34)
         self.from_date.setLayoutDirection(Qt.LeftToRight)
         self._style_date_edit(self.from_date)
         h.addWidget(self._labeled("من تاريخ", self.from_date), 2)
@@ -999,43 +1105,34 @@ class AttendancePage(QWidget):
         self.to_date.setCalendarPopup(True)
         self.to_date.setDisplayFormat("yyyy-MM-dd")
         self.to_date.setDate(QDate.currentDate())
-        self.to_date.setFixedHeight(44)
+        self.to_date.setFixedHeight(34)
         self.to_date.setLayoutDirection(Qt.LeftToRight)
         self._style_date_edit(self.to_date)
         h.addWidget(self._labeled("إلى تاريخ", self.to_date), 2)
 
-        btn_search = QPushButton("🔍  بحث")
-        btn_search.setFixedHeight(44)
-        btn_search.setMinimumWidth(120)
+        btn_search = QPushButton("بحث")
+        btn_search.setFixedHeight(34)
+        btn_search.setMinimumWidth(90)
         btn_search.setCursor(Qt.PointingHandCursor)
-        btn_search.setStyleSheet(self._gradient_btn(PRIMARY, PRIMARY_HOV))
+        btn_search.setStyleSheet(self._primary_btn())
         btn_search.clicked.connect(self._refresh_table)
 
-        btn_upload = QPushButton("📤  رفع بصمة")
-        btn_upload.setFixedHeight(44)
-        btn_upload.setMinimumWidth(140)
+        btn_upload = QPushButton("رفع ملف بصمة")
+        btn_upload.setFixedHeight(34)
+        btn_upload.setMinimumWidth(110)
         btn_upload.setCursor(Qt.PointingHandCursor)
-        btn_upload.setStyleSheet(self._gradient_btn(SUCCESS, SUCCESS_HOV))
+        btn_upload.setStyleSheet(self._secondary_btn())
         btn_upload.clicked.connect(self._upload_punches)
 
         btn_reset = QPushButton("إعادة تعيين")
-        btn_reset.setFixedHeight(44)
-        btn_reset.setMinimumWidth(120)
+        btn_reset.setFixedHeight(34)
+        btn_reset.setMinimumWidth(100)
         btn_reset.setCursor(Qt.PointingHandCursor)
-        btn_reset.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 18px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2}; border-color:{TEXT_MUTED}; color:{TEXT};
-            }}
-        """)
+        btn_reset.setStyleSheet(self._secondary_btn())
         btn_reset.clicked.connect(self._reset_filters)
 
         btns_box = QHBoxLayout()
-        btns_box.setSpacing(9)
+        btns_box.setSpacing(8)
         btns_box.addWidget(btn_search)
         btns_box.addWidget(btn_upload)
         btns_box.addWidget(btn_reset)
@@ -1044,27 +1141,55 @@ class AttendancePage(QWidget):
         btns_wrap.setStyleSheet("background:transparent;")
         bw = QVBoxLayout(btns_wrap)
         bw.setContentsMargins(0, 0, 0, 0)
-        bw.setSpacing(6)
+        bw.setSpacing(5)
         spacer = QLabel("")
-        spacer.setFixedHeight(16)
+        spacer.setFixedHeight(15)
         bw.addWidget(spacer)
         bw.addLayout(btns_box)
 
         h.addWidget(btns_wrap)
         outer.addLayout(h)
 
+        # ---- شريط أدوات إضافي: حذف كل البصمات ----
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        outer.addWidget(line)
+
+        tools_row = QHBoxLayout()
+        tools_row.setSpacing(8)
+
+        self.punch_total_label = QLabel("إجمالي البصمات في النظام: 0")
+        self.punch_total_label.setStyleSheet(
+            f"font-size:11.5px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-weight:600; border:none;"
+        )
+        tools_row.addWidget(self.punch_total_label)
+        tools_row.addStretch()
+
+        btn_delete_all = QPushButton("حذف جميع البصمات")
+        btn_delete_all.setFixedHeight(30)
+        btn_delete_all.setMinimumWidth(140)
+        btn_delete_all.setCursor(Qt.PointingHandCursor)
+        btn_delete_all.setToolTip("يحذف كل البصمات الخام من النظام نهائياً")
+        btn_delete_all.setStyleSheet(self._danger_btn())
+        btn_delete_all.clicked.connect(self._delete_all_punches)
+        tools_row.addWidget(btn_delete_all)
+
+        outer.addLayout(tools_row)
+
         return card
 
     def _input_style(self):
         return f"""
             QLineEdit {{
-                background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
+                background:{SURFACE}; border:1px solid {BORDER_2};
+                border-radius:{RADIUS}; padding:0 10px;
                 font-size:12.5px; color:{TEXT};
                 font-family:{FONT_FAMILY};
             }}
-            QLineEdit:hover {{ background:white; border-color:{BORDER_2}; }}
-            QLineEdit:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
+            QLineEdit:hover {{ border-color:{TEXT_MUTED}; }}
+            QLineEdit:focus {{ border:1px solid {PRIMARY}; }}
         """
 
     def _labeled(self, text, widget):
@@ -1072,11 +1197,11 @@ class AttendancePage(QWidget):
         w.setStyleSheet("background:transparent;")
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
+        v.setSpacing(5)
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"font-size:10.5px; font-weight:800; color:{TEXT_SEC}; "
-            f"background:transparent; letter-spacing:0.2px;"
+            f"font-size:11px; font-weight:600; color:{TEXT_SEC}; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(lbl)
         v.addWidget(widget)
@@ -1085,115 +1210,100 @@ class AttendancePage(QWidget):
     def _style_date_edit(self, w):
         w.setStyleSheet(f"""
             QDateEdit {{
-                background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
-                font-size:12.5px; color:{TEXT}; font-weight:700;
+                background:{SURFACE}; border:1px solid {BORDER_2};
+                border-radius:{RADIUS}; padding:0 10px;
+                font-size:12.5px; color:{TEXT};
+                font-family:{FONT_FAMILY};
             }}
-            QDateEdit:hover {{ background:white; border-color:{BORDER_2}; }}
-            QDateEdit:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
-            QDateEdit::drop-down {{ border:none; width:30px; }}
+            QDateEdit:hover {{ border-color:{TEXT_MUTED}; }}
+            QDateEdit:focus {{ border:1px solid {PRIMARY}; }}
+            QDateEdit::drop-down {{ border:none; width:26px; }}
             QDateEdit::down-arrow {{
                 image:none; width:0; height:0;
                 border-left:4px solid transparent;
                 border-right:4px solid transparent;
                 border-top:5px solid {TEXT_MUTED};
-                margin-right:10px;
+                margin-right:8px;
             }}
         """)
 
-    def _gradient_btn(self, c1, c2):
-        return f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {c1}, stop:1 {c2});
-                color:white; border:none;
-                border-radius:11px; padding:0 22px;
-                font-weight:900; font-size:12.5px;
-                font-family:{FONT_FAMILY};
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4d6bff, stop:1 {c2});
-            }}
-            QPushButton:pressed {{ background:{c2}; }}
-        """
+    def _primary_btn(self):
+        return _primary_btn_style(12)
+
+    def _secondary_btn(self):
+        return _secondary_btn_style(12)
+
+    def _ghost_btn(self):
+        return _secondary_btn_style(12)
+
+    def _danger_btn(self):
+        return _danger_btn_style(12)
 
     def _build_table_card(self):
         card = QFrame()
         card.setObjectName("tableCard")
-        card.setStyleSheet(f"""
-            QFrame#tableCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        card.setStyleSheet(_card_style("tableCard"))
 
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
         head = QFrame()
-        head.setFixedHeight(80)
+        head.setObjectName("tableHead")
+        head.setFixedHeight(52)
         head.setStyleSheet(f"""
-            QFrame {{
+            QFrame#tableHead {{
                 background:{SURFACE};
-                border-bottom:1px solid {DIVIDER};
-                border-top-left-radius:16px;
-                border-top-right-radius:16px;
+                border:none;
+                border-bottom:1px solid {BORDER};
+                border-top-left-radius:{RADIUS};
+                border-top-right-radius:{RADIUS};
             }}
         """)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(24, 0, 24, 0)
-        hl.setSpacing(14)
-
-        hicon = QLabel("📋")
-        hicon.setFixedSize(40, 40)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:11px; font-size:18px;
-            }}
-        """)
-        hl.addWidget(hicon)
+        hl.setContentsMargins(18, 0, 18, 0)
+        hl.setSpacing(12)
 
         hbox = QVBoxLayout()
-        hbox.setSpacing(3)
+        hbox.setSpacing(1)
 
         title = QLabel("سجل ملخص الحضور")
         title.setStyleSheet(
-            f"font-size:15px; font-weight:900; color:{TEXT}; background:transparent;"
+            f"font-size:13px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; border:none;"
         )
         hbox.addWidget(title)
 
         self.range_hint = QLabel("اختر الفترة ثم اضغط بحث")
         self.range_hint.setStyleSheet(
-            f"font-size:10.5px; color:{TEXT_MUTED}; background:transparent;"
+            f"font-size:10.5px; color:{TEXT_MUTED}; background:transparent; border:none;"
         )
         hbox.addWidget(self.range_hint)
         hl.addLayout(hbox)
         hl.addStretch()
 
+        rows_caption = QLabel("عدد الموظفين")
+        rows_caption.setStyleSheet(
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; border:none;"
+        )
+        hl.addWidget(rows_caption)
+
         self.rows_badge = QLabel("0")
         self.rows_badge.setAlignment(Qt.AlignCenter)
-        self.rows_badge.setMinimumWidth(50)
-        self.rows_badge.setFixedHeight(32)
+        self.rows_badge.setMinimumWidth(40)
+        self.rows_badge.setFixedHeight(24)
         self.rows_badge.setStyleSheet(f"""
             QLabel {{
-                background:{PRIMARY_BG}; color:{PRIMARY};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:16px; padding:0 14px;
-                font-size:11.5px; font-weight:900;
+                background:{SURFACE_3}; color:{TEXT_SEC};
+                border:1px solid {BORDER};
+                border-radius:3px; padding:0 10px;
+                font-size:11.5px; font-weight:700;
             }}
         """)
         hl.addWidget(self.rows_badge)
 
         v.addWidget(head)
 
-        # ✅ إضافة عمود "انصراف مبكر" → 14 عمود
         self.table = QTableWidget(0, 14)
         self.table.setHorizontalHeaderLabels([
             "كود الموظف", "اسم الموظف", "نوع الشيفت", "الرصيد (متبقي/ابتدائي)",
@@ -1207,40 +1317,8 @@ class AttendancePage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet(f"""
-            QTableWidget {{
-                background:{SURFACE}; border:none; color:{TEXT};
-                font-size:11.5px; outline:none;
-                selection-background-color:{PRIMARY_BG};
-                selection-color:{TEXT}; gridline-color:transparent;
-                font-family:{FONT_FAMILY};
-            }}
-            QTableWidget::item {{
-                padding:10px 8px; border-bottom:1px solid {DIVIDER};
-            }}
-            QTableWidget::item:selected {{
-                background:{PRIMARY_BG}; color:{TEXT};
-            }}
-            QTableWidget::item:alternate {{ background:{ROW_ALT}; }}
-            QHeaderView::section {{
-                background:{HEADER_BG}; color:{TEXT_MUTED};
-                padding:14px 8px; border:none;
-                border-bottom:1px solid {BORDER};
-                font-weight:900; font-size:10px;
-                letter-spacing:0.3px;
-            }}
-            QScrollBar:vertical {{
-                width:9px; background:transparent;
-                margin:4px 2px 4px 0;
-            }}
-            QScrollBar::handle:vertical {{
-                background:{BORDER_2}; border-radius:4px; min-height:40px;
-            }}
-            QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{ height:0; }}
-        """)
-        self.table.verticalHeader().setDefaultSectionSize(60)
+        self.table.setStyleSheet(_table_style("8px 8px"))
+        self.table.verticalHeader().setDefaultSectionSize(46)
 
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -1269,9 +1347,13 @@ class AttendancePage(QWidget):
 
         code_filter = self.code_input.text().strip()
 
-        all_punches = get_all_raw_punches_in_range(from_d, to_d)
+        to_d_ext = (datetime.strptime(to_d, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        all_punches_ext = get_all_raw_punches_in_range(from_d, to_d_ext)
+
+        all_punches = [p for p in all_punches_ext if from_d <= p["punch_date"] <= to_d]
+
         punches_by_emp = {}
-        for p in all_punches:
+        for p in all_punches_ext:
             emp_id = p["employee_id"]
             if emp_id is None:
                 continue
@@ -1316,11 +1398,19 @@ class AttendancePage(QWidget):
         )
         self.punch_count_label.setText(f"{len(all_punches)} بصمة")
 
+        # تحديث عدّاد إجمالي البصمات في النظام
+        try:
+            self.punch_total_label.setText(
+                f"إجمالي البصمات في النظام: {count_raw_punches()}"
+            )
+        except Exception:
+            pass
+
     def _update_stats(self):
         total_emp = len(self._summary_rows)
         total_present = sum(r["present"] for r in self._summary_rows)
         total_delay = sum(r["_total_delay_min"] for r in self._summary_rows)
-        total_early = sum(r["_total_early_leave_min"] for r in self._summary_rows)  # ✅
+        total_early = sum(r["_total_early_leave_min"] for r in self._summary_rows)
         total_ot = sum(r["_total_overtime_min"] for r in self._summary_rows)
 
         self.stat_employees._value_label.setText(str(total_emp))
@@ -1401,7 +1491,6 @@ class AttendancePage(QWidget):
             delay_item.setForeground(QColor(WARNING if r["_total_delay_min"] > 0 else TEXT_MUTED))
             self.table.setItem(i, 6, delay_item)
 
-            # ✅ عمود الانصراف المبكر الجديد
             early_item = QTableWidgetItem(r["early_leave_str"])
             early_item.setTextAlignment(Qt.AlignCenter)
             early_item.setForeground(QColor(PINK if r["_total_early_leave_min"] > 0 else TEXT_MUTED))
@@ -1441,21 +1530,11 @@ class AttendancePage(QWidget):
             el.setContentsMargins(4, 0, 4, 0)
             el.setAlignment(Qt.AlignCenter)
 
-            btn_edit = QPushButton("✎  تعديل")
-            btn_edit.setFixedHeight(34)
-            btn_edit.setMinimumWidth(90)
+            btn_edit = QPushButton("تعديل")
+            btn_edit.setFixedHeight(28)
+            btn_edit.setMinimumWidth(66)
             btn_edit.setCursor(Qt.PointingHandCursor)
-            btn_edit.setStyleSheet(f"""
-                QPushButton {{
-                    background:{SURFACE}; color:{PRIMARY};
-                    border:1px solid {BORDER_2}; border-radius:9px;
-                    padding:0 14px; font-weight:800; font-size:11px;
-                }}
-                QPushButton:hover {{
-                    background:{PRIMARY_BG}; border-color:{PRIMARY};
-                    color:{PRIMARY_DK};
-                }}
-            """)
+            btn_edit.setStyleSheet(_row_btn_style(11.5))
             btn_edit.clicked.connect(
                 lambda _, emp_id=r["employee_id"]: self._open_detail(emp_id)
             )
@@ -1470,11 +1549,7 @@ class AttendancePage(QWidget):
         hl.setAlignment(Qt.AlignCenter)
         badge = QLabel(text)
         badge.setAlignment(Qt.AlignCenter)
-        badge.setStyleSheet(f"""
-            background:{bg}; color:{color};
-            border:1px solid {brd}; padding:6px 14px;
-            border-radius:12px; font-weight:800; font-size:10.5px;
-        """)
+        badge.setStyleSheet(_badge_style(color, bg, brd, size=11, pad="3px 12px"))
         hl.addWidget(badge)
         return w
 
@@ -1524,11 +1599,84 @@ class AttendancePage(QWidget):
         self._refresh_table()
 
         msg = (
-            f"✅ تم استيراد {inserted} بصمة بنجاح\n"
-            f"⏭ تم تجاهل {skipped_codes} بصمة (كود غير مسجل)\n"
-            f"⚠️ سطور تالفة: {parse_skipped}"
+            f"تم استيراد {inserted} بصمة بنجاح\n"
+            f"تم تجاهل {skipped_codes} بصمة (كود غير مسجل)\n"
+            f"سطور تالفة: {parse_skipped}"
         )
         QMessageBox.information(self, "اكتمل الاستيراد", msg)
+
+    def _delete_all_punches(self):
+        """زر حذف جميع البصمات الخام من النظام (مع تأكد فعلي من الحذف)."""
+        try:
+            total = count_raw_punches()
+        except Exception:
+            total = 0
+
+        if total == 0:
+            QMessageBox.information(
+                self, "لا توجد بصمات",
+                "لا توجد أي بصمات في النظام حالياً لحذفها."
+            )
+            return
+
+        ans = QMessageBox.warning(
+            self, "تأكيد حذف جميع البصمات",
+            f"سيتم حذف جميع البصمات الخام ({total} بصمة) نهائياً من النظام.\n\n"
+            f"هذا الإجراء لا يمكن التراجع عنه.\n"
+            f"تعديلات الحضور اليدوية لن تتأثر.\n\n"
+            f"هل أنت متأكد من المتابعة؟",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if ans != QMessageBox.Yes:
+            return
+
+        # تأكيد ثاني للحماية
+        ans2 = QMessageBox.critical(
+            self, "تأكيد نهائي",
+            f"هل تريد فعلاً حذف {total} بصمة نهائياً؟\n\n"
+            f"اضغط Yes للحذف النهائي أو No للإلغاء.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if ans2 != QMessageBox.Yes:
+            return
+
+        # حذف فعلي
+        try:
+            delete_all_raw_punches()
+        except Exception as e:
+            QMessageBox.critical(
+                self, "خطأ في الحذف",
+                f"فشل حذف البصمات:\n\n{type(e).__name__}: {e}"
+            )
+            return
+
+        # تحقق فعلي من الحذف
+        try:
+            remaining = count_raw_punches()
+        except Exception:
+            remaining = -1
+
+        if remaining > 0:
+            QMessageBox.warning(
+                self, "لم يتم الحذف بالكامل",
+                f"تم حذف {total - remaining} بصمة.\n"
+                f"لكن لا زال هناك {remaining} بصمة في النظام.\n\n"
+                f"الأسباب المحتملة:\n"
+                f"• جهاز البصمة الحية شغّال وبيبعت بصمات جديدة.\n"
+                f"• Auto-sync من الجهاز كل فترة قصيرة.\n"
+                f"• نافذة تانية من التطبيق مفتوحة.\n\n"
+                f"جرّب: اقفل جهاز البصمة / Auto-listen ثم أعد الحذف."
+            )
+        else:
+            QMessageBox.information(
+                self, "تم الحذف بالكامل",
+                f"تم حذف جميع البصمات ({total} بصمة) بنجاح.\n"
+                f"العدد المتبقي: 0"
+            )
+
+        self._refresh_table()
 
     def _open_detail(self, employee_id):
         from_d = self.from_date.date().toString("yyyy-MM-dd")
@@ -1549,7 +1697,7 @@ class DayOverrideDialog(QDialog):
         self.date_str = date_str
 
         self.override = get_attendance_override(employee["id"], date_str)
-        self.punches = get_raw_punches_by_date(employee["id"], date_str)
+        self.punches = get_punches_for_day(employee["id"], date_str)
 
         self.initial_balance = float(employee["annual_leave_balance"] or 0)
         self.used_before = get_annual_leave_used_except_date(
@@ -1559,7 +1707,7 @@ class DayOverrideDialog(QDialog):
 
         self.setLayoutDirection(Qt.RightToLeft)
         self.setWindowTitle(f"تعديل يوم {date_str}")
-        self.setMinimumWidth(720)
+        self.setMinimumWidth(700)
         self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
 
         self._build_ui()
@@ -1567,34 +1715,16 @@ class DayOverrideDialog(QDialog):
 
     def _build_ui(self):
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 24, 24, 24)
-        v.setSpacing(16)
+        v.setContentsMargins(20, 20, 20, 20)
+        v.setSpacing(12)
 
+        # Header
         head = QFrame()
-        head.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(head, blur=20, y_offset=4, alpha=60)
+        head.setObjectName("dayHeader")
+        head.setStyleSheet(_card_style("dayHeader"))
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(20, 16, 20, 16)
-        hl.setSpacing(14)
-
-        icon = QLabel("✎")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(48, 48)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                color:white;
-                border-radius:13px; font-size:22px; font-weight:900;
-            }}
-        """)
-        hl.addWidget(icon)
+        hl.setContentsMargins(18, 14, 18, 14)
+        hl.setSpacing(12)
 
         tbox = QVBoxLayout()
         tbox.setSpacing(3)
@@ -1604,7 +1734,8 @@ class DayOverrideDialog(QDialog):
 
         title = QLabel(f"{day_name}  ·  {self.date_str}")
         title.setStyleSheet(
-            "font-size:16px; font-weight:900; color:white; background:transparent;"
+            f"font-size:14.5px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; border:none;"
         )
         tbox.addWidget(title)
 
@@ -1612,7 +1743,9 @@ class DayOverrideDialog(QDialog):
             f"{self.employee['name']}  ·  شيفت: "
             f"{self.shift['name'] if self.shift else '—'}"
         )
-        sub.setStyleSheet("font-size:10.5px; color:#9db3cf; background:transparent;")
+        sub.setStyleSheet(
+            f"font-size:11.5px; color:{TEXT_MUTED}; background:transparent; border:none;"
+        )
         tbox.addWidget(sub)
         hl.addLayout(tbox)
         hl.addStretch()
@@ -1625,14 +1758,11 @@ class DayOverrideDialog(QDialog):
         else:
             b_color, b_bg, b_brd = INFO, INFO_BG, INFO_BRD
 
-        bal_badge = QLabel(f"🌴  {_fmt_num(rem)} / {_fmt_num(self.initial_balance)}")
+        bal_badge = QLabel(
+            f"رصيد الإجازة: {_fmt_num(rem)} / {_fmt_num(self.initial_balance)}"
+        )
         bal_badge.setAlignment(Qt.AlignCenter)
-        bal_badge.setStyleSheet(f"""
-            background:{b_bg}; color:{b_color};
-            padding:7px 15px; border-radius:13px;
-            font-size:11.5px; font-weight:900;
-            border:1px solid {b_brd};
-        """)
+        bal_badge.setStyleSheet(_badge_style(b_color, b_bg, b_brd, size=11.5, pad="5px 12px"))
         bal_badge.setToolTip(
             f"الابتدائي: {_fmt_num(self.initial_balance)} يوم\n"
             f"المستخدم: {_fmt_num(self.used_before)} يوم\n"
@@ -1642,57 +1772,47 @@ class DayOverrideDialog(QDialog):
 
         v.addWidget(head)
 
+        # بصمات خام
         if self.punches:
             pbox = QFrame()
+            pbox.setObjectName("rawPunches")
             pbox.setStyleSheet(f"""
-                QFrame {{
+                QFrame#rawPunches {{
                     background:{SURFACE_2};
                     border:1px solid {BORDER};
-                    border-radius:11px;
+                    border-radius:{RADIUS};
                 }}
             """)
             pb = QHBoxLayout(pbox)
-            pb.setContentsMargins(15, 11, 15, 11)
-            pb.setSpacing(9)
-
-            ico = QLabel("🕐")
-            ico.setStyleSheet("font-size:15px; background:transparent;")
-            pb.addWidget(ico)
+            pb.setContentsMargins(14, 10, 14, 10)
+            pb.setSpacing(8)
 
             times = "  ·  ".join(format_time_only(p["punch_time"]) for p in self.punches)
-            lbl = QLabel(f"البصمات الخام: {times}")
+            lbl = QLabel(f"البصمات الخام:  {times}")
             lbl.setStyleSheet(
                 f"font-size:11.5px; color:{TEXT_SEC}; "
-                f"background:transparent; font-weight:700;"
+                f"background:transparent; font-weight:600; border:none;"
             )
             pb.addWidget(lbl, 1)
             v.addWidget(pbox)
 
         type_lbl = QLabel("حالة اليوم")
         type_lbl.setStyleSheet(
-            f"font-size:12px; font-weight:900; color:{TEXT}; background:transparent;"
+            f"font-size:12px; font-weight:700; color:{TEXT}; background:transparent;"
         )
         v.addWidget(type_lbl)
 
         status_grid = QGridLayout()
-        status_grid.setHorizontalSpacing(10)
-        status_grid.setVerticalSpacing(10)
+        status_grid.setHorizontalSpacing(8)
+        status_grid.setVerticalSpacing(8)
 
         self.status_checks = {}
         order = ["auto", "present", "absent", "annual_leave", "sick_leave", "work_injury"]
-        icons = {
-            "auto":         "🔄",
-            "present":      "✅",
-            "absent":       "❌",
-            "annual_leave": "🌴",
-            "sick_leave":   "💊",
-            "work_injury":  "🩹",
-        }
 
         for i, key in enumerate(order):
-            cb = QCheckBox(f"{icons[key]}   {DAY_STATUS_LABELS[key]}")
+            cb = QCheckBox(DAY_STATUS_LABELS[key])
             cb.setCursor(Qt.PointingHandCursor)
-            cb.setMinimumHeight(48)
+            cb.setMinimumHeight(38)
             cb.setStyleSheet(self._status_cb_style(key))
             cb.toggled.connect(lambda checked, k=key: self._on_status_toggled(k, checked))
             self.status_checks[key] = cb
@@ -1706,16 +1826,17 @@ class DayOverrideDialog(QDialog):
         v.addLayout(status_grid)
 
         self.time_box = QFrame()
+        self.time_box.setObjectName("timeBox")
         self.time_box.setStyleSheet(f"""
-            QFrame {{
-                background:{SURFACE_2};
+            QFrame#timeBox {{
+                background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:12px;
+                border-radius:{RADIUS};
             }}
         """)
         tb = QHBoxLayout(self.time_box)
-        tb.setContentsMargins(18, 16, 18, 16)
-        tb.setSpacing(14)
+        tb.setContentsMargins(16, 12, 16, 12)
+        tb.setSpacing(12)
 
         self.ci_input = self._time_input("08:00")
         self.co_input = self._time_input("16:00")
@@ -1725,101 +1846,63 @@ class DayOverrideDialog(QDialog):
         v.addWidget(self.time_box)
 
         self.info_box = QFrame()
-        self.info_box.setStyleSheet(f"""
-            QFrame {{
-                background:{INFO_BG};
-                border:1px solid {INFO_BRD};
-                border-radius:11px;
-            }}
-        """)
+        self.info_box.setObjectName("infoBox")
         si = QHBoxLayout(self.info_box)
-        si.setContentsMargins(15, 11, 15, 11)
-        si.setSpacing(9)
-        self.info_icon = QLabel("ℹ️")
-        self.info_icon.setStyleSheet("font-size:16px; background:transparent;")
-        si.addWidget(self.info_icon)
+        si.setContentsMargins(14, 10, 14, 10)
+        si.setSpacing(8)
 
         self.info_lbl = QLabel("")
-        self.info_lbl.setStyleSheet(
-            f"font-size:11.5px; color:{INFO}; background:transparent; font-weight:700;"
-        )
         self.info_lbl.setWordWrap(True)
         si.addWidget(self.info_lbl, 1)
         v.addWidget(self.info_box)
 
         notes_lbl = QLabel("ملاحظات")
         notes_lbl.setStyleSheet(
-            f"font-size:12px; font-weight:900; color:{TEXT}; background:transparent;"
+            f"font-size:12px; font-weight:700; color:{TEXT}; background:transparent;"
         )
         v.addWidget(notes_lbl)
 
         self.notes_input = QTextEdit()
-        self.notes_input.setFixedHeight(72)
+        self.notes_input.setFixedHeight(66)
         self.notes_input.setStyleSheet(f"""
             QTextEdit {{
-                background:{SURFACE_2}; border:1px solid {BORDER};
-                border-radius:11px; padding:10px 14px;
+                background:{SURFACE}; border:1px solid {BORDER_2};
+                border-radius:{RADIUS}; padding:8px 10px;
                 font-size:12px; color:{TEXT};
+                font-family:{FONT_FAMILY};
             }}
-            QTextEdit:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
+            QTextEdit:focus {{ border:1px solid {PRIMARY}; }}
         """)
         v.addWidget(self.notes_input)
 
         v.addStretch()
 
         btns = QHBoxLayout()
-        btns.setSpacing(9)
+        btns.setSpacing(8)
 
-        self.btn_delete = QPushButton("🗑  حذف التعديل")
-        self.btn_delete.setFixedHeight(44)
-        self.btn_delete.setMinimumWidth(140)
+        self.btn_delete = QPushButton("حذف التعديل")
+        self.btn_delete.setFixedHeight(34)
+        self.btn_delete.setMinimumWidth(120)
         self.btn_delete.setCursor(Qt.PointingHandCursor)
-        self.btn_delete.setStyleSheet(f"""
-            QPushButton {{
-                background:{DANGER_BG}; color:{DANGER};
-                border:1px solid {DANGER_BRD}; border-radius:11px;
-                padding:0 18px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:#fee2e2; border-color:{DANGER};
-            }}
-        """)
+        self.btn_delete.setStyleSheet(_danger_btn_style(12))
         self.btn_delete.clicked.connect(self._delete_override)
         btns.addWidget(self.btn_delete)
 
         btns.addStretch()
 
         btn_cancel = QPushButton("إلغاء")
-        btn_cancel.setFixedHeight(44)
-        btn_cancel.setMinimumWidth(110)
+        btn_cancel.setFixedHeight(34)
+        btn_cancel.setMinimumWidth(100)
         btn_cancel.setCursor(Qt.PointingHandCursor)
-        btn_cancel.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 22px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2}; border-color:{TEXT_MUTED};
-            }}
-        """)
+        btn_cancel.setStyleSheet(_secondary_btn_style(12))
         btn_cancel.clicked.connect(self.reject)
         btns.addWidget(btn_cancel)
 
-        btn_save = QPushButton("💾  حفظ")
-        btn_save.setFixedHeight(44)
-        btn_save.setMinimumWidth(150)
+        btn_save = QPushButton("حفظ")
+        btn_save.setFixedHeight(34)
+        btn_save.setMinimumWidth(120)
         btn_save.setCursor(Qt.PointingHandCursor)
-        btn_save.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
-                color:white; border:none;
-                border-radius:11px; padding:0 28px;
-                font-weight:900; font-size:12.5px;
-            }}
-            QPushButton:hover {{ background:{SUCCESS_HOV}; }}
-        """)
+        btn_save.setStyleSheet(_primary_btn_style(12))
         btn_save.clicked.connect(self._save)
         btns.addWidget(btn_save)
 
@@ -1838,28 +1921,28 @@ class DayOverrideDialog(QDialog):
         return f"""
             QCheckBox {{
                 background:{SURFACE};
-                border:1.5px solid {BORDER};
-                border-radius:11px;
-                padding:12px 16px;
-                font-size:12.5px;
-                font-weight:800;
+                border:1px solid {BORDER_2};
+                border-radius:{RADIUS};
+                padding:8px 12px;
+                font-size:12px;
+                font-weight:600;
                 color:{TEXT_SEC};
-                spacing:9px;
+                spacing:8px;
+                font-family:{FONT_FAMILY};
             }}
             QCheckBox:hover {{
-                background:{bg};
-                border-color:{brd};
-                color:{color};
+                background:{SURFACE_3};
+                border-color:{TEXT_MUTED};
             }}
             QCheckBox:checked {{
                 background:{bg};
-                border:2px solid {color};
+                border:1px solid {color};
                 color:{color};
             }}
             QCheckBox::indicator {{
-                width:17px; height:17px;
-                border:1.5px solid {BORDER_2};
-                border-radius:5px;
+                width:14px; height:14px;
+                border:1px solid {BORDER_2};
+                border-radius:3px;
                 background:white;
             }}
             QCheckBox::indicator:hover {{ border-color:{color}; }}
@@ -1873,10 +1956,11 @@ class DayOverrideDialog(QDialog):
         w.setStyleSheet("background:transparent;")
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
+        v.setSpacing(5)
         lbl = QLabel(label)
         lbl.setStyleSheet(
-            f"font-size:11.5px; font-weight:800; color:{TEXT_SEC}; background:transparent;"
+            f"font-size:11px; font-weight:600; color:{TEXT_SEC}; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(lbl)
         v.addWidget(widget)
@@ -1884,7 +1968,7 @@ class DayOverrideDialog(QDialog):
 
     def _time_input(self, default="08:00"):
         inp = QLineEdit()
-        inp.setFixedHeight(44)
+        inp.setFixedHeight(36)
         inp.setLayoutDirection(Qt.LeftToRight)
         inp.setAlignment(Qt.AlignCenter)
         inp.setPlaceholderText("HH:mm")
@@ -1894,12 +1978,13 @@ class DayOverrideDialog(QDialog):
         inp.setValidator(QRegularExpressionValidator(regex))
         inp.setStyleSheet(f"""
             QLineEdit {{
-                background:white; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
-                font-size:14px; font-weight:800; color:{TEXT};
-                letter-spacing:1.5px;
+                background:white; border:1px solid {BORDER_2};
+                border-radius:{RADIUS}; padding:0 12px;
+                font-size:13px; font-weight:600; color:{TEXT};
+                letter-spacing:1px;
+                font-family:{FONT_FAMILY};
             }}
-            QLineEdit:focus {{ border:1.5px solid {PRIMARY}; }}
+            QLineEdit:focus {{ border:1px solid {PRIMARY}; }}
         """)
         return inp
 
@@ -1931,6 +2016,22 @@ class DayOverrideDialog(QDialog):
 
         self._update_visibility(key)
 
+    def _set_info(self, kind, text):
+        color, bg, brd = NOTE_KINDS.get(kind, NOTE_KINDS["info"])
+        self.info_box.setStyleSheet(f"""
+            QFrame#infoBox {{
+                background:{bg};
+                border:1px solid {brd};
+                border-radius:{RADIUS};
+            }}
+        """)
+        self.info_lbl.setStyleSheet(
+            f"font-size:11.5px; color:{color}; background:transparent; "
+            f"font-weight:600; border:none; font-family:{FONT_FAMILY};"
+        )
+        self.info_lbl.setText(text)
+        self.info_box.setVisible(True)
+
     def _update_visibility(self, key=None):
         if key is None:
             key = "auto"
@@ -1946,22 +2047,12 @@ class DayOverrideDialog(QDialog):
         policy_lbl = SICK_POLICY_LABELS.get(policy, policy)
 
         if key == "sick_leave":
-            self.info_icon.setText("💊")
-            self.info_lbl.setText(f"سيتم تطبيق سياسة المرضية من الشيفت: {policy_lbl}")
-            self.info_box.setStyleSheet(f"""
-                QFrame {{
-                    background:{WARNING_BG};
-                    border:1px solid {WARNING_BRD};
-                    border-radius:11px;
-                }}
-            """)
-            self.info_lbl.setStyleSheet(
-                f"font-size:11.5px; color:{WARNING}; background:transparent; font-weight:800;"
+            self._set_info(
+                "warning",
+                f"سيتم تطبيق سياسة المرضية من الشيفت: {policy_lbl}"
             )
-            self.info_box.setVisible(True)
 
         elif key == "annual_leave":
-            self.info_icon.setText("🌴")
             init = self.initial_balance
             used = self.used_before
             rem = self.remaining_before
@@ -1974,101 +2065,36 @@ class DayOverrideDialog(QDialog):
             )
 
             if rem < 1.0:
-                txt += "\n⚠️ تحذير: الرصيد المتبقي غير كافٍ!"
-                self.info_box.setStyleSheet(f"""
-                    QFrame {{
-                        background:{DANGER_BG};
-                        border:1px solid {DANGER_BRD};
-                        border-radius:11px;
-                    }}
-                """)
-                self.info_lbl.setStyleSheet(
-                    f"font-size:11.5px; color:{DANGER}; "
-                    f"background:transparent; font-weight:800;"
-                )
+                txt += "\nتحذير: الرصيد المتبقي غير كافٍ."
+                self._set_info("danger", txt)
             else:
-                self.info_box.setStyleSheet(f"""
-                    QFrame {{
-                        background:{INFO_BG};
-                        border:1px solid {INFO_BRD};
-                        border-radius:11px;
-                    }}
-                """)
-                self.info_lbl.setStyleSheet(
-                    f"font-size:11.5px; color:{INFO}; "
-                    f"background:transparent; font-weight:800;"
-                )
-
-            self.info_lbl.setText(txt)
-            self.info_box.setVisible(True)
+                self._set_info("info", txt)
 
         elif key == "work_injury":
-            self.info_icon.setText("🩹")
-            self.info_lbl.setText(
+            self._set_info(
+                "pink",
                 "إصابة عمل: لا يوجد أي خصم — يُحتسب اليوم كحضور بإذن مسبق."
             )
-            self.info_box.setStyleSheet(f"""
-                QFrame {{
-                    background:{PINK_BG};
-                    border:1px solid {PINK_BRD};
-                    border-radius:11px;
-                }}
-            """)
-            self.info_lbl.setStyleSheet(
-                f"font-size:11.5px; color:{PINK}; background:transparent; font-weight:800;"
-            )
-            self.info_box.setVisible(True)
 
         elif key == "absent":
-            self.info_icon.setText("❌")
-            self.info_lbl.setText("غياب: لن يُحتسب اليوم كحضور وستُطبق قواعد الخصم من الشيفت.")
-            self.info_box.setStyleSheet(f"""
-                QFrame {{
-                    background:{DANGER_BG};
-                    border:1px solid {DANGER_BRD};
-                    border-radius:11px;
-                }}
-            """)
-            self.info_lbl.setStyleSheet(
-                f"font-size:11.5px; color:{DANGER}; background:transparent; font-weight:800;"
+            self._set_info(
+                "danger",
+                "غياب: لن يُحتسب اليوم كحضور وستُطبق قواعد الخصم من الشيفت."
             )
-            self.info_box.setVisible(True)
 
         elif key == "present":
-            self.info_icon.setText("✅")
-            self.info_lbl.setText(
+            self._set_info(
+                "success",
                 "حاضر بأوقات مخصصة: سيتم استخدام الأوقات أدناه بدلاً من البصمة الخام، "
                 "وسيتم حساب الانصراف المبكر تلقائياً لو الخروج قبل نهاية الشيفت."
             )
-            self.info_box.setStyleSheet(f"""
-                QFrame {{
-                    background:{SUCCESS_BG};
-                    border:1px solid {SUCCESS_BRD};
-                    border-radius:11px;
-                }}
-            """)
-            self.info_lbl.setStyleSheet(
-                f"font-size:11.5px; color:{SUCCESS}; background:transparent; font-weight:800;"
-            )
-            self.info_box.setVisible(True)
 
         else:
-            self.info_icon.setText("🔄")
-            self.info_lbl.setText(
+            self._set_info(
+                "info",
                 "تلقائي: يُحسب اليوم من البصمة (مع احتساب الانصراف المبكر)، "
                 "ويمكنك تخصيص الأوقات إن أردت."
             )
-            self.info_box.setStyleSheet(f"""
-                QFrame {{
-                    background:{INFO_BG};
-                    border:1px solid {INFO_BRD};
-                    border-radius:11px;
-                }}
-            """)
-            self.info_lbl.setStyleSheet(
-                f"font-size:11.5px; color:{INFO}; background:transparent; font-weight:700;"
-            )
-            self.info_box.setVisible(True)
 
     def _load_values(self):
         status = "auto"
@@ -2121,7 +2147,13 @@ class DayOverrideDialog(QDialog):
             if ci_t:
                 ci = f"{self.date_str} {ci_t}:00"
             if co_t:
-                co = f"{self.date_str} {co_t}:00"
+                if ci_t and co_t < ci_t:
+                    next_date = (
+                        datetime.strptime(self.date_str, "%Y-%m-%d") + timedelta(days=1)
+                    ).strftime("%Y-%m-%d")
+                    co = f"{next_date} {co_t}:00"
+                else:
+                    co = f"{self.date_str} {co_t}:00"
 
         if status == "annual_leave":
             if self.remaining_before < 1.0:
@@ -2190,7 +2222,7 @@ class AttendanceDetailDialog(QDialog):
 
         self.setLayoutDirection(Qt.RightToLeft)
         self.setWindowTitle(f"تفاصيل الحضور — {emp['name'] if emp else ''}")
-        self.setMinimumSize(1400, 800)
+        self.setMinimumSize(1300, 760)
         self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
 
         self._build_ui()
@@ -2198,48 +2230,32 @@ class AttendanceDetailDialog(QDialog):
 
     def _build_ui(self):
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 24, 24, 24)
-        v.setSpacing(14)
+        v.setContentsMargins(20, 20, 20, 20)
+        v.setSpacing(12)
 
+        # Header
         head = QFrame()
         head.setObjectName("detailHeader")
-        head.setStyleSheet(f"""
-            QFrame#detailHeader {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(head, blur=20, y_offset=4, alpha=60)
+        head.setStyleSheet(_card_style("detailHeader"))
 
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(22, 18, 22, 18)
-        hl.setSpacing(16)
-
-        icon = QLabel("📅")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(50, 50)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:14px; font-size:23px;
-            }}
-        """)
-        hl.addWidget(icon)
+        hl.setContentsMargins(20, 14, 20, 14)
+        hl.setSpacing(12)
 
         tbox = QVBoxLayout()
         tbox.setSpacing(3)
 
         title = QLabel(f"{self.employee['name']}  ·  {self.employee['code']}")
         title.setStyleSheet(
-            "font-size:16px; font-weight:900; color:white; background:transparent;"
+            f"font-size:15px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; border:none;"
         )
         tbox.addWidget(title)
 
         sub = QLabel(f"الفترة: {self.from_date}  →  {self.to_date}")
-        sub.setStyleSheet("font-size:10.5px; color:#9db3cf; background:transparent;")
+        sub.setStyleSheet(
+            f"font-size:11.5px; color:{TEXT_MUTED}; background:transparent; border:none;"
+        )
         tbox.addWidget(sub)
         hl.addLayout(tbox)
         hl.addStretch()
@@ -2252,12 +2268,7 @@ class AttendanceDetailDialog(QDialog):
                 f"{'صباحي' if self.shift['shift_type'] == 'morning' else 'مسائي'}  ·  "
                 f"مرضية: {policy_lbl}"
             )
-            shift_lbl.setStyleSheet(f"""
-                background: rgba(59, 91, 253, 0.15); color:#c7d2fe;
-                padding:7px 15px; border-radius:13px;
-                font-size:11.5px; font-weight:800;
-                border:1px solid rgba(59, 91, 253, 0.35);
-            """)
+            shift_lbl.setStyleSheet(_badge_style(TEXT_SEC, SURFACE_3, BORDER, size=11.5, pad="5px 12px"))
             hl.addWidget(shift_lbl)
 
         if self.annual_remaining <= 0:
@@ -2268,15 +2279,10 @@ class AttendanceDetailDialog(QDialog):
             bal_color, bal_bg, bal_brd = INFO, INFO_BG, INFO_BRD
 
         bal_lbl = QLabel(
-            f"🌴  رصيد الإجازة: {_fmt_num(self.annual_remaining)} / "
+            f"رصيد الإجازة: {_fmt_num(self.annual_remaining)} / "
             f"{_fmt_num(self.annual_initial)}"
         )
-        bal_lbl.setStyleSheet(f"""
-            background:{bal_bg}; color:{bal_color};
-            padding:7px 15px; border-radius:13px;
-            font-size:11.5px; font-weight:900;
-            border:1px solid {bal_brd};
-        """)
+        bal_lbl.setStyleSheet(_badge_style(bal_color, bal_bg, bal_brd, size=11.5, pad="5px 12px"))
         bal_lbl.setToolTip(
             f"الابتدائي: {_fmt_num(self.annual_initial)} يوم\n"
             f"المستخدم: {_fmt_num(self.annual_used)} يوم\n"
@@ -2288,7 +2294,6 @@ class AttendanceDetailDialog(QDialog):
 
         self._build_stats_row(v)
 
-        # ✅ عمود جديد: الانصراف المبكر → 10 أعمدة
         self.table = QTableWidget(0, 10)
         self.table.setHorizontalHeaderLabels([
             "التاريخ", "اليوم", "الحضور", "الانصراف",
@@ -2300,82 +2305,37 @@ class AttendanceDetailDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
-        self.table.setStyleSheet(f"""
-            QTableWidget {{
-                background:{SURFACE}; border:1px solid {BORDER};
-                border-radius:14px; color:{TEXT};
-                font-size:11.5px; outline:none;
-                selection-background-color:{PRIMARY_BG};
-                selection-color:{TEXT}; gridline-color:transparent;
-                font-family:{FONT_FAMILY};
-            }}
-            QTableWidget::item {{
-                padding:9px; border-bottom:1px solid {DIVIDER};
-            }}
-            QTableWidget::item:selected {{
-                background:{PRIMARY_BG}; color:{TEXT};
-            }}
-            QTableWidget::item:alternate {{ background:{ROW_ALT}; }}
-            QHeaderView::section {{
-                background:{HEADER_BG}; color:{TEXT_MUTED};
-                padding:13px 9px; border:none;
-                border-bottom:1px solid {BORDER};
-                font-weight:900; font-size:10.5px;
-                letter-spacing:0.2px;
-            }}
-            QScrollBar:vertical {{
-                width:9px; background:transparent;
-                margin:4px 2px 4px 0;
-            }}
-            QScrollBar::handle:vertical {{
-                background:{BORDER_2}; border-radius:4px; min-height:40px;
-            }}
-            QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{ height:0; }}
-        """)
+        self.table.setStyleSheet(
+            _table_style("7px 8px")
+            + f"QTableWidget {{ border:1px solid {BORDER}; }}"
+        )
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
         hh.setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setColumnWidth(9, 100)
-        self.table.verticalHeader().setDefaultSectionSize(48)
+        self.table.verticalHeader().setDefaultSectionSize(42)
         v.addWidget(self.table, 1)
 
         footer = QFrame()
-        footer.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:1 {NAVY_2});
-                border-radius:14px;
-            }}
-        """)
-        apply_shadow(footer, blur=14, y_offset=3, alpha=50)
+        footer.setObjectName("detailFooter")
+        footer.setStyleSheet(_card_style("detailFooter"))
 
         fl = QHBoxLayout(footer)
-        fl.setContentsMargins(20, 14, 20, 14)
-        fl.setSpacing(14)
+        fl.setContentsMargins(18, 12, 18, 12)
+        fl.setSpacing(12)
 
         self.totals_label = QLabel("")
-        self.totals_label.setStyleSheet("""
-            font-size:12px; color:white; background:transparent; font-weight:800;
-        """)
+        self.totals_label.setStyleSheet(
+            f"font-size:11.5px; color:{TEXT_SEC}; background:transparent; "
+            f"font-weight:600; border:none;"
+        )
         fl.addWidget(self.totals_label, 1)
 
         btn_close = QPushButton("إغلاق")
-        btn_close.setFixedHeight(40)
-        btn_close.setMinimumWidth(130)
+        btn_close.setFixedHeight(34)
+        btn_close.setMinimumWidth(110)
         btn_close.setCursor(Qt.PointingHandCursor)
-        btn_close.setStyleSheet(f"""
-            QPushButton {{
-                background:{NAVY_3}; color:white;
-                border:1px solid {NAVY_ACCENT};
-                border-radius:11px;
-                padding:0 24px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{NAVY_ACCENT};
-            }}
-        """)
+        btn_close.setStyleSheet(_secondary_btn_style(12))
         btn_close.clicked.connect(self.accept)
         fl.addWidget(btn_close)
         v.addWidget(footer)
@@ -2388,25 +2348,16 @@ class AttendanceDetailDialog(QDialog):
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(10)
 
-        self.card_present = self._mini_card("أيام الحضور", "0", "✅",
-                                            SUCCESS, SUCCESS_BG, SUCCESS_BRD)
-        self.card_absent = self._mini_card("الغياب", "0", "❌",
-                                           DANGER, DANGER_BG, DANGER_BRD)
-        self.card_annual = self._mini_card("إجازة سنوية", "0", "🌴",
-                                           INFO, INFO_BG, INFO_BRD)
-        self.card_sick = self._mini_card("إجازة مرضية", "0", "💊",
-                                         WARNING, WARNING_BG, WARNING_BRD)
+        self.card_present = self._mini_card("أيام الحضور", "0", SUCCESS)
+        self.card_absent = self._mini_card("الغياب", "0", DANGER)
+        self.card_annual = self._mini_card("إجازة سنوية", "0", INFO)
+        self.card_sick = self._mini_card("إجازة مرضية", "0", WARNING)
 
-        self.card_injury = self._mini_card("إصابة عمل", "0", "🩹",
-                                           PINK, PINK_BG, PINK_BRD)
-        self.card_weekly = self._mini_card("راحة أسبوعية", "0", "🌙",
-                                           GRAY, GRAY_BG, GRAY_BRD)
-        self.card_delay = self._mini_card("إجمالي التأخير", "0", "⏱",
-                                          WARNING, WARNING_BG, WARNING_BRD)
-        self.card_early = self._mini_card("إجمالي الانصراف المبكر", "0", "⏳",
-                                          PINK, PINK_BG, PINK_BRD)           # ✅
-        self.card_overtime = self._mini_card("إجمالي الإضافي", "0", "➕",
-                                             PURPLE, PURPLE_BG, PURPLE_BRD)
+        self.card_injury = self._mini_card("إصابة عمل", "0", PINK)
+        self.card_weekly = self._mini_card("راحة أسبوعية", "0", GRAY)
+        self.card_delay = self._mini_card("إجمالي التأخير", "0", WARNING)
+        self.card_early = self._mini_card("الانصراف المبكر", "0", PINK)
+        self.card_overtime = self._mini_card("إجمالي الإضافي", "0", PURPLE)
 
         grid.addWidget(self.card_present, 0, 0)
         grid.addWidget(self.card_absent, 0, 1)
@@ -2424,52 +2375,30 @@ class AttendanceDetailDialog(QDialog):
 
         parent_layout.addWidget(wrap)
 
-    def _mini_card(self, title, value, icon_text, color, soft, brd):
+    def _mini_card(self, title, value, color):
         card = QFrame()
         card.setObjectName("miniStat")
-        card.setMinimumHeight(78)
-        card.setStyleSheet(f"""
-            QFrame#miniStat {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:13px;
-            }}
-        """)
-        apply_shadow(card, blur=10, y_offset=2, alpha=18)
+        card.setMinimumHeight(60)
+        card.setStyleSheet(_card_style("miniStat"))
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(14, 12, 14, 12)
-        h.setSpacing(11)
-
-        ic = QLabel(icon_text)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(42, 42)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{soft}; color:{color};
-                border:1px solid {brd};
-                border-radius:11px; font-size:18px; font-weight:900;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
+        v = QVBoxLayout(card)
+        v.setContentsMargins(14, 8, 14, 8)
         v.setSpacing(2)
+
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10px; color:{TEXT_MUTED}; font-weight:800; "
-            f"background:transparent;"
+            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:600; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(lbl)
 
         val = QLabel(value)
         val.setStyleSheet(
-            f"font-size:18px; color:{TEXT}; font-weight:900; background:transparent;"
+            f"font-size:17px; color:{color}; font-weight:700; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(val)
 
-        h.addLayout(v)
-        h.addStretch()
         card._value_label = val
         return card
 
@@ -2487,7 +2416,7 @@ class AttendanceDetailDialog(QDialog):
         total_injury = 0
         total_weekly = 0
         total_delay = 0
-        total_early = 0                    # ✅
+        total_early = 0
         total_overtime = 0
         total_days = 0
 
@@ -2502,7 +2431,7 @@ class AttendanceDetailDialog(QDialog):
 
             if not is_wd:
                 if override and override["day_status"] not in ("auto", "weekly_holiday"):
-                    punches = get_raw_punches_by_date(self.employee_id, date_str)
+                    punches = get_punches_for_day(self.employee_id, date_str)
                     stats = compute_day_stats(
                         self.employee, self.shift, punches,
                         override=override, is_working_day=False
@@ -2524,7 +2453,7 @@ class AttendanceDetailDialog(QDialog):
                 current += timedelta(days=1)
                 continue
 
-            punches = get_raw_punches_by_date(self.employee_id, date_str)
+            punches = get_punches_for_day(self.employee_id, date_str)
             stats = compute_day_stats(
                 self.employee, self.shift, punches,
                 override=override, is_working_day=True
@@ -2534,7 +2463,7 @@ class AttendanceDetailDialog(QDialog):
             if st == "present":
                 total_present += 1
                 total_delay += stats["delay_min"]
-                total_early += stats.get("early_leave_min", 0)    # ✅
+                total_early += stats.get("early_leave_min", 0)
                 total_overtime += stats["overtime_min"]
             elif st == "absent":
                 total_absent += 1
@@ -2560,21 +2489,52 @@ class AttendanceDetailDialog(QDialog):
             format_minutes_ar(total_delay) if total_delay > 0 else "0"
         )
         self.card_early._value_label.setText(
-            format_minutes_ar(total_early) if total_early > 0 else "0"      # ✅
+            format_minutes_ar(total_early) if total_early > 0 else "0"
         )
         self.card_overtime._value_label.setText(
             format_overtime_ar(total_overtime) if total_overtime > 0 else "0"
         )
 
         self.totals_label.setText(
-            f"📊   إجمالي الأيام: {total_days}   ·   "
+            f"إجمالي الأيام: {total_days}   ·   "
             f"حضور: {total_present}   ·   غياب: {total_absent}   ·   "
             f"سنوية: {total_annual}   ·   مرضية: {total_sick}   ·   "
             f"إصابة: {total_injury}   ·   راحة: {total_weekly}   ·   "
             f"تأخير: {format_minutes_ar(total_delay)}   ·   "
-            f"انصراف مبكر: {format_minutes_ar(total_early)}   ·   "       # ✅
+            f"انصراف مبكر: {format_minutes_ar(total_early)}   ·   "
             f"إضافي: {format_overtime_ar(total_overtime)}"
         )
+
+    def _status_badge_widget(self, text, color, bg, brd):
+        badge_wrap = QWidget()
+        badge_wrap.setStyleSheet("background:transparent;")
+        bl = QHBoxLayout(badge_wrap)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setAlignment(Qt.AlignCenter)
+
+        badge = QLabel(text)
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setStyleSheet(_badge_style(color, bg, brd, size=11, pad="3px 12px"))
+        bl.addWidget(badge)
+        return badge_wrap
+
+    def _edit_button_widget(self, date_str, tooltip=None):
+        edit_wrap = QWidget()
+        edit_wrap.setStyleSheet("background:transparent;")
+        el = QHBoxLayout(edit_wrap)
+        el.setContentsMargins(2, 0, 2, 0)
+        el.setAlignment(Qt.AlignCenter)
+
+        btn_edit = QPushButton("تعديل")
+        btn_edit.setFixedHeight(26)
+        btn_edit.setMinimumWidth(66)
+        btn_edit.setCursor(Qt.PointingHandCursor)
+        if tooltip:
+            btn_edit.setToolTip(tooltip)
+        btn_edit.setStyleSheet(_row_btn_style(11))
+        btn_edit.clicked.connect(lambda _, d=date_str: self._edit_day(d))
+        el.addWidget(btn_edit)
+        return edit_wrap
 
     def _render_weekly_holiday_row(self, row_idx, date_str, day_name):
         d_item = QTableWidgetItem(date_str)
@@ -2587,53 +2547,20 @@ class AttendanceDetailDialog(QDialog):
         day_item.setForeground(QColor(TEXT_MUTED))
         self.table.setItem(row_idx, 1, day_item)
 
-        # 4 أعمدة (الحضور، الانصراف، التأخير، انصراف مبكر، إضافي، خصم) = 6 (2..7)
         for c in range(2, 8):
             it = QTableWidgetItem("—")
             it.setTextAlignment(Qt.AlignCenter)
             it.setForeground(QColor(TEXT_MUTED))
             self.table.setItem(row_idx, c, it)
 
-        badge_wrap = QWidget()
-        badge_wrap.setStyleSheet("background:transparent;")
-        bl = QHBoxLayout(badge_wrap)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setAlignment(Qt.AlignCenter)
-
-        badge = QLabel("🌙  راحة أسبوعية")
-        badge.setAlignment(Qt.AlignCenter)
-        badge.setStyleSheet(f"""
-            background:{GRAY_BG}; color:{GRAY};
-            border:1px solid {GRAY_BRD};
-            padding:5px 14px; border-radius:12px;
-            font-weight:800; font-size:10.5px;
-        """)
-        bl.addWidget(badge)
-        self.table.setCellWidget(row_idx, 8, badge_wrap)
-
-        edit_wrap = QWidget()
-        edit_wrap.setStyleSheet("background:transparent;")
-        el = QHBoxLayout(edit_wrap)
-        el.setContentsMargins(2, 0, 2, 0)
-        el.setAlignment(Qt.AlignCenter)
-
-        btn_edit = QPushButton("✎")
-        btn_edit.setFixedSize(34, 32)
-        btn_edit.setCursor(Qt.PointingHandCursor)
-        btn_edit.setToolTip("تخصيص اليوم (اختياري)")
-        btn_edit.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{PRIMARY};
-                border:1px solid {BORDER_2}; border-radius:9px;
-                font-size:13px; font-weight:900;
-            }}
-            QPushButton:hover {{
-                background:{PRIMARY_BG}; border-color:{PRIMARY};
-            }}
-        """)
-        btn_edit.clicked.connect(lambda _, d=date_str: self._edit_day(d))
-        el.addWidget(btn_edit)
-        self.table.setCellWidget(row_idx, 9, edit_wrap)
+        self.table.setCellWidget(
+            row_idx, 8,
+            self._status_badge_widget("راحة أسبوعية", GRAY, GRAY_BG, GRAY_BRD)
+        )
+        self.table.setCellWidget(
+            row_idx, 9,
+            self._edit_button_widget(date_str, "تخصيص اليوم (اختياري)")
+        )
 
     def _render_day_row(self, row_idx, date_str, day_name, stats):
         d_item = QTableWidgetItem(date_str)
@@ -2663,7 +2590,6 @@ class AttendanceDetailDialog(QDialog):
         delay_item.setForeground(QColor(WARNING if stats["delay_min"] > 0 else TEXT_MUTED))
         self.table.setItem(row_idx, 4, delay_item)
 
-        # ✅ عمود الانصراف المبكر
         early_min = stats.get("early_leave_min", 0)
         early_item = QTableWidgetItem(format_minutes_ar(early_min))
         early_item.setTextAlignment(Qt.AlignCenter)
@@ -2677,9 +2603,11 @@ class AttendanceDetailDialog(QDialog):
         ot_item = QTableWidgetItem(format_overtime_ar(stats["overtime_min"]))
         ot_item.setTextAlignment(Qt.AlignCenter)
         ot_item.setForeground(QColor(PURPLE if stats["overtime_min"] > 0 else TEXT_MUTED))
+        ot_item.setToolTip(
+            f"الإضافي محسوب حتى الساعة {OVERTIME_CUTOFF} كحد أقصى"
+        )
         self.table.setItem(row_idx, 6, ot_item)
 
-        # الخصم: اجمع بين خصم التأخير + خصم الانصراف المبكر
         ded_parts = []
         if stats["deduction_label"] != "—":
             ded_parts.append(f"تأخير: {stats['deduction_label']}")
@@ -2694,53 +2622,16 @@ class AttendanceDetailDialog(QDialog):
         self.table.setItem(row_idx, 7, ded_item)
 
         label_data = STATUS_STYLE.get(stats["status"], ("—", TEXT_MUTED, SURFACE_2, BORDER, ""))
-        label_text, color, bg, brd, emoji = label_data
+        label_text, color, bg, brd, _unused = label_data
 
-        badge_wrap = QWidget()
-        badge_wrap.setStyleSheet("background:transparent;")
-        bl = QHBoxLayout(badge_wrap)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setAlignment(Qt.AlignCenter)
-
-        text = f"{emoji}   {label_text}"
+        text = label_text
         if stats["override_applied"]:
-            text = "✎  " + text
+            text = f"{label_text}  (معدّل)"
 
-        badge = QLabel(text)
-        badge.setAlignment(Qt.AlignCenter)
-        badge.setStyleSheet(f"""
-            background:{bg}; color:{color};
-            border:1px solid {brd};
-            padding:5px 14px; border-radius:11px;
-            font-weight:800; font-size:10.5px;
-        """)
-        bl.addWidget(badge)
-        self.table.setCellWidget(row_idx, 8, badge_wrap)
-
-        edit_wrap = QWidget()
-        edit_wrap.setStyleSheet("background:transparent;")
-        el = QHBoxLayout(edit_wrap)
-        el.setContentsMargins(2, 0, 2, 0)
-        el.setAlignment(Qt.AlignCenter)
-
-        btn_edit = QPushButton("✎  تعديل")
-        btn_edit.setFixedHeight(32)
-        btn_edit.setMinimumWidth(82)
-        btn_edit.setCursor(Qt.PointingHandCursor)
-        btn_edit.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{PRIMARY};
-                border:1px solid {BORDER_2}; border-radius:9px;
-                padding:0 12px; font-weight:800; font-size:11px;
-            }}
-            QPushButton:hover {{
-                background:{PRIMARY_BG}; border-color:{PRIMARY};
-                color:{PRIMARY_DK};
-            }}
-        """)
-        btn_edit.clicked.connect(lambda _, d=date_str: self._edit_day(d))
-        el.addWidget(btn_edit)
-        self.table.setCellWidget(row_idx, 9, edit_wrap)
+        self.table.setCellWidget(
+            row_idx, 8, self._status_badge_widget(text, color, bg, brd)
+        )
+        self.table.setCellWidget(row_idx, 9, self._edit_button_widget(date_str))
 
     def _edit_day(self, date_str):
         dlg = DayOverrideDialog(self.employee, self.shift, date_str, self)

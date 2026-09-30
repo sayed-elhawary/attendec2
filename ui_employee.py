@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QMessageBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame, QGridLayout, QScrollArea,
     QAbstractItemView, QFileDialog, QCheckBox, QDialog,
-    QListWidget, QListWidgetItem, QMenu, QGraphicsDropShadowEffect
+    QListWidget, QListWidgetItem, QMenu, QStackedWidget
 )
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDoubleValidator, QColor, QDesktopServices, QAction
@@ -20,59 +20,53 @@ from database import (
 
 
 # ============================================================
-#                نظام الألوان الاحترافي (Modern Pro)
+#     نظام ألوان مسطح وهادئ
 # ============================================================
-BG          = "#f1f5f9"
-BG_2        = "#eef2f7"
+BG          = "#eef0f3"
 SURFACE     = "#ffffff"
-SURFACE_2   = "#f8fafc"
-SURFACE_3   = "#f1f5f9"
-BORDER      = "#e2e8f0"
-BORDER_2    = "#cbd5e1"
-DIVIDER     = "#eef2f7"
+SURFACE_2   = "#f8f9fa"
+SURFACE_3   = "#f1f3f5"
+BORDER      = "#d8dce1"
+BORDER_2    = "#c3c9d0"
+DIVIDER     = "#e8ebee"
 
-TEXT        = "#0f172a"
-TEXT_SEC    = "#475569"
-TEXT_MUTED  = "#94a3b8"
+TEXT        = "#1f2933"
+TEXT_SEC    = "#4b5563"
+TEXT_MUTED  = "#7b8794"
 
-NAVY        = "#0b1729"
-NAVY_2      = "#132a4a"
-NAVY_3      = "#1e3a5f"
-NAVY_ACCENT = "#1e40af"
+PRIMARY     = "#1f4e8c"
+PRIMARY_HOV = "#1a4275"
+PRIMARY_DK  = "#153561"
+PRIMARY_BG  = "#e8eff8"
+PRIMARY_BRD = "#b6c8e0"
 
-PRIMARY     = "#2563eb"
-PRIMARY_HOV = "#1d4ed8"
-PRIMARY_DK  = "#1e40af"
-PRIMARY_BG  = "#eff6ff"
-PRIMARY_BRD = "#bfdbfe"
+SUCCESS     = "#2f7d4f"
+SUCCESS_HOV = "#276a43"
+SUCCESS_BG  = "#eaf4ee"
+SUCCESS_BRD = "#b9d9c5"
 
-SUCCESS     = "#059669"
-SUCCESS_HOV = "#047857"
-SUCCESS_BG  = "#ecfdf5"
-SUCCESS_BRD = "#a7f3d0"
+DANGER      = "#b3372f"
+DANGER_HOV  = "#992d26"
+DANGER_BG   = "#fbeceb"
+DANGER_BRD  = "#e6b9b5"
 
-DANGER      = "#dc2626"
-DANGER_HOV  = "#b91c1c"
-DANGER_BG   = "#fef2f2"
-DANGER_BRD  = "#fecaca"
+WARNING     = "#a86a12"
+WARNING_BG  = "#fbf3e4"
+WARNING_BRD = "#e6cf9f"
 
-WARNING     = "#d97706"
-WARNING_HOV = "#b45309"
-WARNING_BG  = "#fffbeb"
-WARNING_BRD = "#fde68a"
+INFO        = "#2a6f8f"
+INFO_BG     = "#e9f2f6"
+INFO_BRD    = "#b5d2df"
 
-INFO        = "#0891b2"
-INFO_BG     = "#ecfeff"
-INFO_BRD    = "#a5f3fc"
+PURPLE      = "#5f4b8b"
+PURPLE_BG   = "#efecf5"
+PURPLE_BRD  = "#cfc6e0"
 
-PURPLE      = "#7c3aed"
-PURPLE_BG   = "#f5f3ff"
-PURPLE_BRD  = "#ddd6fe"
-
-ROW_ALT     = "#fafbfc"
-HEADER_BG   = "#f8fafc"
+ROW_ALT     = "#f8f9fa"
+HEADER_BG   = "#f1f3f5"
 
 FONT_FAMILY = "Segoe UI, Tahoma, Arial, sans-serif"
+RADIUS = "4px"
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -84,14 +78,98 @@ def get_employee_folder(code: str) -> Path:
     return folder
 
 
-def apply_shadow(widget, blur=18, y_offset=2, alpha=20):
-    effect = QGraphicsDropShadowEffect(widget)
-    effect.setBlurRadius(blur)
-    effect.setXOffset(0)
-    effect.setYOffset(y_offset)
-    effect.setColor(QColor(15, 23, 42, alpha))
-    widget.setGraphicsEffect(effect)
-    return effect
+# ============================================================
+#                     Helpers (Styles)
+# ============================================================
+def _card_style(object_name):
+    return f"""
+        QFrame#{object_name} {{
+            background:{SURFACE};
+            border:1px solid {BORDER};
+            border-radius:{RADIUS};
+        }}
+    """
+
+
+def _primary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{PRIMARY}; color:white;
+            border:1px solid {PRIMARY}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{PRIMARY_HOV}; border-color:{PRIMARY_HOV}; }}
+        QPushButton:pressed {{ background:{PRIMARY_DK}; border-color:{PRIMARY_DK}; }}
+    """
+
+
+def _secondary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{TEXT};
+            border:1px solid {BORDER_2}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SURFACE_3}; border-color:{TEXT_MUTED}; }}
+        QPushButton:pressed {{ background:{DIVIDER}; }}
+    """
+
+
+def _success_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{SUCCESS}; color:white;
+            border:1px solid {SUCCESS}; border-radius:{RADIUS};
+            padding:0 18px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SUCCESS_HOV}; border-color:{SUCCESS_HOV}; }}
+        QPushButton:pressed {{ background:#1f5f3c; }}
+    """
+
+
+def _badge_style(color, bg, brd, size=11, pad="3px 10px"):
+    return f"""
+        QLabel {{
+            background:{bg}; color:{color};
+            border:1px solid {brd}; padding:{pad};
+            border-radius:3px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+    """
+
+
+def _input_qss():
+    return f"""
+        QLineEdit {{
+            background:{SURFACE}; border:1px solid {BORDER_2};
+            border-radius:{RADIUS}; padding:0 12px;
+            font-size:12.5px; color:{TEXT};
+            selection-background-color:{PRIMARY_BG};
+            selection-color:{PRIMARY_DK};
+            font-family:{FONT_FAMILY};
+        }}
+        QLineEdit:hover {{ border-color:{TEXT_MUTED}; }}
+        QLineEdit:focus {{ border:1px solid {PRIMARY}; }}
+    """
+
+
+def _scroll_qss():
+    return f"""
+        QScrollArea {{ background:transparent; border:none; }}
+        QScrollBar:vertical {{
+            width:10px; background:{SURFACE_3}; margin:0;
+        }}
+        QScrollBar::handle:vertical {{
+            background:{BORDER_2}; border-radius:2px;
+            min-height:40px; margin:2px;
+        }}
+        QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {{ height:0; }}
+    """
 
 
 # ============================================================
@@ -120,20 +198,16 @@ class EmployeePage(QWidget):
         root.setSpacing(0)
         root.addWidget(self._build_topbar())
 
-        body = QWidget()
-        body.setObjectName("employeeBody")
-        body.setStyleSheet(f"QWidget#employeeBody {{ background:{BG}; }}")
-        body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(26, 22, 26, 26)
-        body_layout.setSpacing(18)
-        body_layout.addWidget(self._build_stats())
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet(f"QStackedWidget {{ background:{BG}; }}")
 
-        content = QHBoxLayout()
-        content.setSpacing(20)
-        content.addWidget(self._build_table_card(), 7)
-        content.addWidget(self._build_form_card(), 4)
-        body_layout.addLayout(content, 1)
-        root.addWidget(body, 1)
+        self.list_page = self._build_list_page()
+        self.form_page = self._build_form_page()
+
+        self.stack.addWidget(self.list_page)
+        self.stack.addWidget(self.form_page)
+
+        root.addWidget(self.stack, 1)
 
     # ----------------------------------------------------------
     #                       TOPBAR
@@ -141,143 +215,96 @@ class EmployeePage(QWidget):
     def _build_topbar(self):
         bar = QFrame()
         bar.setObjectName("employeeTopbar")
-        bar.setFixedHeight(96)
+        bar.setFixedHeight(58)
         bar.setStyleSheet(f"""
             QFrame#employeeTopbar {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
+                background:{SURFACE};
                 border:none;
-                border-bottom:1px solid #1e3a5f;
+                border-bottom:1px solid {BORDER};
             }}
         """)
 
         h = QHBoxLayout(bar)
-        h.setContentsMargins(30, 0, 30, 0)
-        h.setSpacing(18)
-
-        # Icon container
-        icon = QLabel("👥")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(54, 54)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:15px;
-                font-size:24px;
-            }}
-        """)
-        apply_shadow(icon, blur=14, y_offset=2, alpha=60)
-        h.addWidget(icon)
+        h.setContentsMargins(24, 0, 24, 0)
+        h.setSpacing(16)
 
         title_box = QVBoxLayout()
-        title_box.setSpacing(4)
+        title_box.setSpacing(1)
 
         title = QLabel("إدارة الموظفين")
         title.setStyleSheet(f"""
             QLabel {{
-                color:white; font-size:22px; font-weight:900;
+                color:{TEXT}; font-size:15px; font-weight:700;
                 background:transparent; font-family:{FONT_FAMILY};
-                letter-spacing:0.3px;
+                border:none;
             }}
         """)
         title_box.addWidget(title)
 
-        subtitle = QLabel("إدارة بيانات العاملين والرواتب والحالة الوظيفية من مكان واحد")
+        subtitle = QLabel("إدارة بيانات العاملين والرواتب والحالة الوظيفية")
         subtitle.setStyleSheet(
-            "QLabel { color:#94a8c4; font-size:11px; background:transparent; }"
+            f"QLabel {{ color:{TEXT_MUTED}; font-size:11px; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none; }}"
         )
         title_box.addWidget(subtitle)
         h.addLayout(title_box)
         h.addStretch()
 
-        # Count badge
         self.count_inline = QLabel("0 موظف")
         self.count_inline.setAlignment(Qt.AlignCenter)
-        self.count_inline.setMinimumWidth(100)
-        self.count_inline.setFixedHeight(38)
+        self.count_inline.setMinimumWidth(90)
+        self.count_inline.setFixedHeight(28)
         self.count_inline.setStyleSheet(f"""
             QLabel {{
-                background: rgba(59, 91, 253, 0.15);
-                color:#c7d2fe;
-                border:1px solid rgba(59, 91, 253, 0.35);
-                border-radius:19px;
-                padding:0 18px;
+                background:{SURFACE_3};
+                color:{TEXT_SEC};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+                padding:0 14px;
                 font-size:11.5px;
-                font-weight:800;
+                font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
         """)
         h.addWidget(self.count_inline)
-
-        # Search box
-        search = QFrame()
-        search.setFixedSize(340, 46)
-        search.setObjectName("topSearch")
-        search.setStyleSheet(f"""
-            QFrame#topSearch {{
-                background: rgba(255, 255, 255, 0.06);
-                border:1px solid rgba(255, 255, 255, 0.12);
-                border-radius:12px;
-            }}
-            QFrame#topSearch:hover {{
-                background: rgba(255, 255, 255, 0.09);
-                border:1px solid rgba(255, 255, 255, 0.18);
-            }}
-        """)
-        sh = QHBoxLayout(search)
-        sh.setContentsMargins(14, 0, 14, 0)
-        sh.setSpacing(10)
-
-        search_icon = QLabel("⌕")
-        search_icon.setStyleSheet(
-            "font-size:23px; color:#7c93b5; background:transparent; font-weight:900;"
-        )
-        sh.addWidget(search_icon)
-
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("ابحث بالاسم أو الكود أو القسم...")
-        self.search.setFrame(False)
-        self.search.setStyleSheet("""
-            QLineEdit {
-                background:transparent;
-                border:none;
-                padding:0;
-                color:white;
-                font-size:12.5px;
-                font-family: Segoe UI, Tahoma, Arial;
-            }
-        """)
-        self.search.textChanged.connect(self._filter_table)
-        sh.addWidget(self.search, 1)
-        h.addWidget(search)
         return bar
 
     # ----------------------------------------------------------
-    #                    بطاقات الإحصائيات
+    #               صفحة القائمة (الإحصائيات + الجدول)
     # ----------------------------------------------------------
+    def _build_list_page(self):
+        page = QWidget()
+        page.setObjectName("listPage")
+        page.setStyleSheet(f"QWidget#listPage {{ background:{BG}; }}")
+        v = QVBoxLayout(page)
+        v.setContentsMargins(24, 20, 24, 24)
+        v.setSpacing(16)
+        v.addWidget(self._build_stats())
+        v.addWidget(self._build_table_card(), 1)
+        return page
+
     def _build_stats(self):
         wrap = QWidget()
         wrap.setStyleSheet("background:transparent;")
         grid = QGridLayout(wrap)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(14)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
 
         self.stat_total = self._stat_card(
-            "إجمالي الموظفين", "0", "👥",
+            "إجمالي الموظفين", "0",
             PRIMARY, PRIMARY_BG, PRIMARY_BRD, "سجل مسجّل"
         )
         self.stat_active = self._stat_card(
-            "الموظفون النشطون", "0", "✓",
+            "الموظفون النشطون", "0",
             SUCCESS, SUCCESS_BG, SUCCESS_BRD, "على رأس العمل"
         )
         self.stat_inactive = self._stat_card(
-            "الموقوفون", "0", "⏸",
+            "الموقوفون", "0",
             WARNING, WARNING_BG, WARNING_BRD, "موقوف مؤقتاً"
         )
         self.stat_departments = self._stat_card(
-            "الأقسام", "0", "▦",
+            "الأقسام", "0",
             PURPLE, PURPLE_BG, PURPLE_BRD, "قسم/إدارة"
         )
 
@@ -290,161 +317,154 @@ class EmployeePage(QWidget):
             grid.setColumnStretch(col, 1)
         return wrap
 
-    def _stat_card(self, title, value, icon_text, color, soft, border_color, unit):
+    def _stat_card(self, title, value, color, soft, border_color, unit):
         card = QFrame()
         card.setObjectName("statCard")
-        card.setMinimumHeight(96)
+        card.setMinimumHeight(88)
         card.setStyleSheet(f"""
             QFrame#statCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:{RADIUS};
             }}
             QFrame#statCard:hover {{
-                border:1.5px solid {border_color};
+                border:1px solid {border_color};
             }}
         """)
-        apply_shadow(card, blur=16, y_offset=3, alpha=25)
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(18, 14, 18, 14)
-        h.setSpacing(14)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(8)
 
-        ic = QLabel(icon_text)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(52, 52)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{soft};
-                color:{color};
-                border:1.5px solid {border_color};
-                border-radius:14px;
-                font-size:22px;
-                font-weight:900;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
-        v.setSpacing(2)
+        top = QHBoxLayout()
+        top.setSpacing(8)
 
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:800; "
-            f"background:transparent; letter-spacing:0.3px;"
+            f"font-size:11px; color:{TEXT_MUTED}; font-weight:600; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
         )
-        v.addWidget(lbl)
+        top.addWidget(lbl)
+        top.addStretch()
 
-        # Value + unit
-        vrow = QHBoxLayout()
-        vrow.setSpacing(6)
+        un = QLabel(unit)
+        un.setStyleSheet(_badge_style(color, soft, border_color, size=10, pad="2px 8px"))
+        top.addWidget(un)
+
+        v.addLayout(top)
 
         val = QLabel(value)
         val.setStyleSheet(
-            f"font-size:26px; color:{TEXT}; font-weight:900; background:transparent;"
+            f"font-size:24px; color:{TEXT}; font-weight:700; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
         )
-        vrow.addWidget(val)
-
-        vrow.addStretch()
-
-        un = QLabel(unit)
-        un.setStyleSheet(f"""
-            font-size:9.5px;
-            color:{color};
-            background:{soft};
-            border:1px solid {border_color};
-            border-radius:9px;
-            padding:3px 8px;
-            font-weight:800;
-        """)
-        vrow.addWidget(un)
-
-        v.addLayout(vrow)
-        h.addLayout(v)
-        h.addStretch()
+        v.addWidget(val)
+        v.addStretch()
 
         card._value_label = val
         return card
 
     # ----------------------------------------------------------
-    #                    بطاقة الجدول
+    #              بطاقة الجدول (بعرض كامل)
     # ----------------------------------------------------------
     def _build_table_card(self):
         card = QFrame()
         card.setObjectName("tableCard")
-        card.setStyleSheet(f"""
-            QFrame#tableCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        card.setStyleSheet(_card_style("tableCard"))
 
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
-        # Header
+        # Header bar with title + search + filters + add button
         head = QFrame()
-        head.setFixedHeight(80)
+        head.setFixedHeight(64)
         head.setObjectName("tableHead")
         head.setStyleSheet(f"""
             QFrame#tableHead {{
                 background:{SURFACE};
-                border-bottom:1px solid {DIVIDER};
-                border-top-left-radius:16px;
-                border-top-right-radius:16px;
+                border:none;
+                border-bottom:1px solid {BORDER};
+                border-top-left-radius:{RADIUS};
+                border-top-right-radius:{RADIUS};
             }}
         """)
 
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setContentsMargins(18, 0, 18, 0)
         hl.setSpacing(14)
 
-        hicon = QLabel("📋")
-        hicon.setFixedSize(40, 40)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:11px;
-                font-size:18px;
-            }}
-        """)
-        hl.addWidget(hicon)
-
-        title_box = QVBoxLayout()
-        title_box.setSpacing(3)
+        # Title
+        tbox = QVBoxLayout()
+        tbox.setSpacing(1)
 
         title = QLabel("سجل الموظفين")
         title.setStyleSheet(
-            f"font-size:15px; font-weight:900; color:{TEXT}; background:transparent;"
+            f"font-size:13.5px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
         )
-        title_box.addWidget(title)
+        tbox.addWidget(title)
 
         hint = QLabel("عرض وإدارة جميع الموظفين المسجلين في النظام")
-        hint.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED}; background:transparent;")
-        title_box.addWidget(hint)
-        hl.addLayout(title_box)
+        hint.setStyleSheet(
+            f"font-size:10.5px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none;"
+        )
+        tbox.addWidget(hint)
+        hl.addLayout(tbox)
         hl.addStretch()
 
+        # Search
+        search = QFrame()
+        search.setFixedSize(280, 36)
+        search.setObjectName("topSearch")
+        search.setStyleSheet(f"""
+            QFrame#topSearch {{
+                background:{SURFACE_2};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+            }}
+            QFrame#topSearch:hover {{ border:1px solid {BORDER_2}; }}
+        """)
+        sh = QHBoxLayout(search)
+        sh.setContentsMargins(12, 0, 12, 0)
+        sh.setSpacing(8)
+
+        icon = QLabel("⌕")
+        icon.setStyleSheet(
+            f"font-size:16px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-weight:600; border:none;"
+        )
+        sh.addWidget(icon)
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("ابحث بالاسم أو الكود أو القسم...")
+        self.search.setFrame(False)
+        self.search.setStyleSheet(f"""
+            QLineEdit {{
+                background:transparent; border:none; padding:0;
+                color:{TEXT}; font-size:12.5px;
+                font-family:{FONT_FAMILY};
+            }}
+        """)
+        self.search.textChanged.connect(self._filter_table)
+        sh.addWidget(self.search, 1)
+        hl.addWidget(search)
+
+        # Show inactive checkbox
         self.chk_inactive = QCheckBox("إظهار الموقوفين")
         self.chk_inactive.setCursor(Qt.PointingHandCursor)
         self.chk_inactive.setStyleSheet(f"""
             QCheckBox {{
-                font-size:11.5px;
-                color:{TEXT_SEC};
-                background:transparent;
-                spacing:8px;
-                padding:4px;
-                font-weight:700;
+                font-size:11.5px; color:{TEXT_SEC};
+                background:transparent; spacing:7px;
+                padding:4px; font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
             QCheckBox::indicator {{
-                width:18px; height:18px;
-                border:1.5px solid {BORDER_2};
-                border-radius:5px;
+                width:15px; height:15px;
+                border:1px solid {BORDER_2};
+                border-radius:3px;
                 background:white;
             }}
             QCheckBox::indicator:hover {{ border-color:{PRIMARY}; }}
@@ -456,22 +476,32 @@ class EmployeePage(QWidget):
         self.chk_inactive.toggled.connect(self._toggle_show_inactive)
         hl.addWidget(self.chk_inactive)
 
+        # Count badge
         self.count_badge = QLabel("0")
         self.count_badge.setAlignment(Qt.AlignCenter)
-        self.count_badge.setMinimumWidth(50)
-        self.count_badge.setFixedHeight(32)
+        self.count_badge.setMinimumWidth(44)
+        self.count_badge.setFixedHeight(26)
         self.count_badge.setStyleSheet(f"""
             QLabel {{
-                background:{PRIMARY_BG};
-                color:{PRIMARY};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:16px;
-                padding:0 15px;
-                font-size:11.5px;
-                font-weight:900;
+                background:{SURFACE_3}; color:{TEXT_SEC};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+                padding:0 12px;
+                font-size:11.5px; font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
         """)
         hl.addWidget(self.count_badge)
+
+        # Add new button
+        btn_add = QPushButton("+  موظف جديد")
+        btn_add.setFixedHeight(36)
+        btn_add.setMinimumWidth(140)
+        btn_add.setCursor(Qt.PointingHandCursor)
+        btn_add.setStyleSheet(_primary_btn_style(12))
+        btn_add.clicked.connect(self._new_employee)
+        hl.addWidget(btn_add)
+
         v.addWidget(head)
 
         # Table
@@ -492,12 +522,13 @@ class EmployeePage(QWidget):
                 background:{SURFACE};
                 border:none;
                 color:{TEXT};
-                font-size:11.5px;
+                font-size:12px;
                 outline:none;
                 selection-background-color:{PRIMARY_BG};
                 selection-color:{TEXT};
-                gridline-color:transparent;
+                gridline-color:{DIVIDER};
                 font-family:{FONT_FAMILY};
+                alternate-background-color:{ROW_ALT};
             }}
             QTableWidget::item {{
                 padding:8px;
@@ -507,38 +538,34 @@ class EmployeePage(QWidget):
                 background:{PRIMARY_BG};
                 color:{TEXT};
             }}
-            QTableWidget::item:alternate {{
-                background:{ROW_ALT};
-            }}
+            QTableWidget::item:hover {{ background:{SURFACE_2}; }}
             QHeaderView::section {{
                 background:{HEADER_BG};
-                color:{TEXT_MUTED};
-                padding:14px 10px;
+                color:{TEXT_SEC};
+                padding:10px 8px;
                 border:none;
-                border-bottom:1px solid {BORDER};
-                font-weight:900;
-                font-size:10px;
-                letter-spacing:0.3px;
+                border-bottom:1px solid {BORDER_2};
+                border-left:1px solid {DIVIDER};
+                font-weight:700;
+                font-size:11px;
+                font-family:{FONT_FAMILY};
             }}
             QScrollBar:vertical {{
-                width:9px;
-                background:transparent;
-                margin:4px 2px 4px 0;
+                width:10px;
+                background:{SURFACE_3};
+                margin:0;
             }}
             QScrollBar::handle:vertical {{
                 background:{BORDER_2};
-                border-radius:4px;
+                border-radius:2px;
                 min-height:40px;
+                margin:2px;
             }}
-            QScrollBar::handle:vertical:hover {{
-                background:{TEXT_MUTED};
-            }}
+            QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
             QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{
-                height:0;
-            }}
+            QScrollBar::sub-line:vertical {{ height:0; }}
         """)
-        self.table.verticalHeader().setDefaultSectionSize(68)
+        self.table.verticalHeader().setDefaultSectionSize(58)
 
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -551,278 +578,248 @@ class EmployeePage(QWidget):
         return card
 
     # ----------------------------------------------------------
-    #                    بطاقة النموذج
+    #              صفحة النموذج (كاملة)
     # ----------------------------------------------------------
-    def _build_form_card(self):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
-            QScrollArea { background:transparent; border:none; }
-            QScrollBar:vertical {
-                width:9px; background:transparent; margin:2px 0;
-            }
-            QScrollBar::handle:vertical {
-                background:#cbd5e1; border-radius:4px; min-height:40px;
-            }
-            QScrollBar::handle:vertical:hover { background:#94a3b8; }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical { height:0; }
-        """)
-
-        card = QFrame()
-        card.setObjectName("formCard")
-        card.setStyleSheet(f"""
-            QFrame#formCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
-        scroll.setWidget(card)
-
-        v = QVBoxLayout(card)
-        v.setContentsMargins(22, 22, 22, 22)
+    def _build_form_page(self):
+        page = QWidget()
+        page.setObjectName("formPage")
+        page.setStyleSheet(f"QWidget#formPage {{ background:{BG}; }}")
+        v = QVBoxLayout(page)
+        v.setContentsMargins(24, 20, 24, 24)
         v.setSpacing(16)
 
-        # Form header
+        # Top header bar
         head = QFrame()
-        head.setObjectName("formHeader")
+        head.setObjectName("formTopbar")
         head.setStyleSheet(f"""
-            QFrame#formHeader {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:14px;
+            QFrame#formTopbar {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
             }}
         """)
-        apply_shadow(head, blur=12, y_offset=2, alpha=45)
+        hl = QHBoxLayout(head)
+        hl.setContentsMargins(18, 14, 18, 14)
+        hl.setSpacing(14)
 
-        hh = QHBoxLayout(head)
-        hh.setContentsMargins(18, 14, 18, 14)
-        hh.setSpacing(12)
+        btn_back = QPushButton("→  العودة للقائمة")
+        btn_back.setFixedHeight(36)
+        btn_back.setCursor(Qt.PointingHandCursor)
+        btn_back.setStyleSheet(_secondary_btn_style(12))
+        btn_back.clicked.connect(self._cancel_form)
+        hl.addWidget(btn_back)
 
-        icon = QLabel("👤")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(46, 46)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                color:white;
-                border-radius:13px;
-                font-size:19px;
-                font-weight:900;
-            }}
-        """)
-        hh.addWidget(icon)
+        divider = QFrame()
+        divider.setFixedSize(1, 30)
+        divider.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        hl.addWidget(divider)
 
-        title_box = QVBoxLayout()
-        title_box.setSpacing(3)
+        tbox = QVBoxLayout()
+        tbox.setSpacing(2)
 
         self.form_title = QLabel("موظف جديد")
         self.form_title.setStyleSheet(
-            "font-size:15.5px; font-weight:900; color:white; background:transparent;"
+            f"font-size:15px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
         )
-        title_box.addWidget(self.form_title)
+        tbox.addWidget(self.form_title)
 
         self.form_subtitle = QLabel("إضافة سجل موظف جديد")
         self.form_subtitle.setStyleSheet(
-            "font-size:10.5px; color:#9db3cf; background:transparent;"
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none;"
         )
-        title_box.addWidget(self.form_subtitle)
-        hh.addLayout(title_box, 1)
-        v.addWidget(head)
+        tbox.addWidget(self.form_subtitle)
+        hl.addLayout(tbox)
+        hl.addStretch()
 
-        # ============ Basic Data Section ============
-        v.addWidget(self._section("البيانات الأساسية", PRIMARY, "👤"))
-        g1 = self._grid()
-
-        self.code = self._input("EMP-001", ltr=True)
-        self.name = self._input("الاسم الكامل")
-        self.dept = self._input("القسم / الإدارة")
-        self.phone = self._input("01xxxxxxxxx", ltr=True)
-        self.annual_leave = self._num()
-        self.shift_combo = self._combo()
-
-        g1.addWidget(self._field("الكود", self.code), 0, 0)
-        g1.addWidget(self._field("الاسم", self.name), 0, 1)
-        g1.addWidget(self._field("القسم", self.dept), 1, 0)
-        g1.addWidget(self._field("الهاتف", self.phone), 1, 1)
-        g1.addWidget(self._field("الشيفت", self.shift_combo), 2, 0)
-        g1.addWidget(self._field("رصيد الإجازة", self.annual_leave), 2, 1)
-        v.addLayout(g1)
-
-        # ============ Salary Section ============
-        v.addWidget(self._section("الراتب والبدلات", SUCCESS, "💰"))
-        g2 = self._grid()
-
-        self.base_salary = self._num()
-        self.total_salary = self._num()
-        self.incentive = self._num()
-        self.meal = self._num()
-        self.transport = self._num()
-        self.expat = self._num()
-        self.other = self._num()
-
-        g2.addWidget(self._field("الأساسي", self.base_salary), 0, 0)
-        g2.addWidget(self._field("الإجمالي", self.total_salary), 0, 1)
-        g2.addWidget(self._field("الحافز", self.incentive), 1, 0)
-        g2.addWidget(self._field("بدل وجبة", self.meal), 1, 1)
-        g2.addWidget(self._field("بدل مواصلات", self.transport), 2, 0)
-        g2.addWidget(self._field("بدل اغتراب", self.expat), 2, 1)
-        g2.addWidget(self._field("بدلات أخرى", self.other), 3, 0)
-        v.addLayout(g2)
-
-        # ============ Insurance Section ============
-        v.addWidget(self._section("التأمينات", INFO, "🛡"))
-        g3 = self._grid()
-        self.medical = self._num()
-        self.social = self._num()
-        g3.addWidget(self._field("تأمين طبي", self.medical), 0, 0)
-        g3.addWidget(self._field("تأمين اجتماعي", self.social), 0, 1)
-        v.addLayout(g3)
-
-        v.addStretch(1)
-
-        # Divider
-        line = QFrame()
-        line.setFixedHeight(1)
-        line.setStyleSheet(f"background:{DIVIDER};")
-        v.addWidget(line)
-
-        # Buttons
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(9)
-
-        self.btn_files = QPushButton("📎  الملفات")
-        self.btn_files.setFixedHeight(44)
+        self.btn_files = QPushButton("ملفات الموظف")
+        self.btn_files.setFixedHeight(36)
         self.btn_files.setCursor(Qt.PointingHandCursor)
         self.btn_files.setStyleSheet(f"""
             QPushButton {{
                 background:{INFO_BG};
                 color:{INFO};
                 border:1px solid {INFO_BRD};
-                border-radius:11px;
+                border-radius:{RADIUS};
                 padding:0 18px;
-                font-size:11.5px;
-                font-weight:800;
+                font-size:12px;
+                font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
             QPushButton:hover {{
-                background:#cffafe;
+                background:#d9e9f0;
                 border-color:{INFO};
             }}
         """)
         self.btn_files.clicked.connect(self._open_files)
         self.btn_files.setVisible(False)
-        btn_row.addWidget(self.btn_files)
-        btn_row.addStretch()
+        hl.addWidget(self.btn_files)
+
+        v.addWidget(head)
+
+        # Scrollable content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(_scroll_qss())
+
+        content = QWidget()
+        content.setStyleSheet("background:transparent;")
+        cl = QHBoxLayout(content)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(16)
+
+        # Left column
+        left_col = QVBoxLayout()
+        left_col.setSpacing(16)
+        left_col.addWidget(self._section_card("البيانات الأساسية", PRIMARY, "basic"))
+        left_col.addWidget(self._section_card("التأمينات", INFO, "insurance"))
+        left_col.addStretch()
+
+        # Right column
+        right_col = QVBoxLayout()
+        right_col.setSpacing(16)
+        right_col.addWidget(self._section_card("الراتب والبدلات", SUCCESS, "salary"))
+        right_col.addStretch()
+
+        cl.addLayout(left_col, 1)
+        cl.addLayout(right_col, 1)
+
+        scroll.setWidget(content)
+        v.addWidget(scroll, 1)
+
+        # Footer with save/cancel
+        footer = QFrame()
+        footer.setObjectName("formFooter")
+        footer.setStyleSheet(f"""
+            QFrame#formFooter {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+            }}
+        """)
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(18, 12, 18, 12)
+        fl.setSpacing(10)
+        fl.addStretch()
 
         self.btn_cancel = QPushButton("إلغاء")
-        self.btn_cancel.setFixedHeight(44)
+        self.btn_cancel.setFixedHeight(40)
+        self.btn_cancel.setMinimumWidth(120)
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
-        self.btn_cancel.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE};
-                color:{TEXT_SEC};
-                border:1px solid {BORDER_2};
-                border-radius:11px;
-                padding:0 22px;
-                font-size:11.5px;
-                font-weight:800;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-                color:{TEXT};
-            }}
-        """)
+        self.btn_cancel.setStyleSheet(_secondary_btn_style(12))
         self.btn_cancel.clicked.connect(self._cancel_form)
-        self.btn_cancel.setVisible(False)
 
-        self.btn_save = QPushButton("💾  حفظ الموظف")
-        self.btn_save.setFixedHeight(44)
+        self.btn_save = QPushButton("حفظ الموظف")
+        self.btn_save.setFixedHeight(40)
+        self.btn_save.setMinimumWidth(170)
         self.btn_save.setCursor(Qt.PointingHandCursor)
-        self.btn_save.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_HOV});
-                color:white;
-                border:none;
-                border-radius:11px;
-                padding:0 26px;
-                font-size:12.5px;
-                font-weight:900;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4d6bff, stop:1 {PRIMARY_HOV});
-            }}
-            QPushButton:pressed {{
-                background:{PRIMARY_DK};
-            }}
-        """)
+        self.btn_save.setStyleSheet(_primary_btn_style(12))
         self.btn_save.clicked.connect(self._save)
 
-        btn_row.addWidget(self.btn_cancel)
-        btn_row.addWidget(self.btn_save)
-        v.addLayout(btn_row)
+        fl.addWidget(self.btn_cancel)
+        fl.addWidget(self.btn_save)
+        v.addWidget(footer)
 
-        return scroll
+        return page
+
+    def _section_card(self, title, color, key):
+        card = QFrame()
+        card.setObjectName("sectionCard")
+        card.setStyleSheet(f"""
+            QFrame#sectionCard {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+            }}
+        """)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(20, 18, 20, 20)
+        v.setSpacing(14)
+
+        # Section header
+        h = QHBoxLayout()
+        h.setSpacing(9)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 16)
+        marker.setStyleSheet(f"background:{color}; border:none; border-radius:2px;")
+        h.addWidget(marker)
+
+        lbl = QLabel(title)
+        lbl.setStyleSheet(
+            f"font-size:12.5px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
+        )
+        h.addWidget(lbl)
+        h.addStretch()
+        v.addLayout(h)
+
+        # Fields grid
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+
+        if key == "basic":
+            self.code = self._input("EMP-001", ltr=True)
+            self.name = self._input("الاسم الكامل")
+            self.dept = self._input("القسم / الإدارة")
+            self.phone = self._input("01xxxxxxxxx", ltr=True)
+            self.shift_combo = self._combo()
+            self.annual_leave = self._num()
+
+            grid.addWidget(self._field("الكود", self.code), 0, 0)
+            grid.addWidget(self._field("الاسم", self.name), 0, 1)
+            grid.addWidget(self._field("القسم", self.dept), 1, 0)
+            grid.addWidget(self._field("الهاتف", self.phone), 1, 1)
+            grid.addWidget(self._field("الشيفت", self.shift_combo), 2, 0)
+            grid.addWidget(self._field("رصيد الإجازة", self.annual_leave), 2, 1)
+
+        elif key == "salary":
+            self.base_salary = self._num()
+            self.total_salary = self._num()
+            self.incentive = self._num()
+            self.meal = self._num()
+            self.transport = self._num()
+            self.expat = self._num()
+            self.other = self._num()
+
+            grid.addWidget(self._field("الأساسي", self.base_salary), 0, 0)
+            grid.addWidget(self._field("الإجمالي", self.total_salary), 0, 1)
+            grid.addWidget(self._field("الحافز", self.incentive), 1, 0)
+            grid.addWidget(self._field("بدل وجبة", self.meal), 1, 1)
+            grid.addWidget(self._field("بدل مواصلات", self.transport), 2, 0)
+            grid.addWidget(self._field("بدل اغتراب", self.expat), 2, 1)
+            grid.addWidget(self._field("بدلات أخرى", self.other), 3, 0)
+
+        elif key == "insurance":
+            self.medical = self._num()
+            self.social = self._num()
+
+            grid.addWidget(self._field("تأمين طبي", self.medical), 0, 0)
+            grid.addWidget(self._field("تأمين اجتماعي", self.social), 0, 1)
+
+        v.addLayout(grid)
+        return card
 
     # ----------------------------------------------------------
     #                    عناصر مساعدة
     # ----------------------------------------------------------
-    def _section(self, text, color=PRIMARY, emoji=""):
-        w = QWidget()
-        w.setStyleSheet("background:transparent;")
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 8, 0, 0)
-        h.setSpacing(9)
-
-        marker = QFrame()
-        marker.setFixedSize(4, 20)
-        marker.setStyleSheet(f"background:{color}; border-radius:2px;")
-        h.addWidget(marker)
-
-        if emoji:
-            em = QLabel(emoji)
-            em.setStyleSheet("font-size:14px; background:transparent;")
-            h.addWidget(em)
-
-        lbl = QLabel(text)
-        lbl.setStyleSheet(
-            f"font-size:12px; font-weight:900; color:{TEXT}; "
-            f"background:transparent; letter-spacing:0.3px;"
-        )
-        h.addWidget(lbl)
-
-        line = QFrame()
-        line.setFixedHeight(1)
-        line.setStyleSheet(f"background:{DIVIDER};")
-        h.addWidget(line, 1)
-        return w
-
-    def _grid(self):
-        g = QGridLayout()
-        g.setHorizontalSpacing(10)
-        g.setVerticalSpacing(10)
-        g.setColumnStretch(0, 1)
-        g.setColumnStretch(1, 1)
-        return g
-
     def _field(self, label_text, widget):
         w = QWidget()
         w.setStyleSheet("background:transparent;")
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
+        v.setSpacing(5)
 
         lbl = QLabel(label_text)
         lbl.setStyleSheet(
-            f"font-size:10.5px; font-weight:800; color:{TEXT_SEC}; "
-            f"background:transparent; letter-spacing:0.2px;"
+            f"font-size:11px; font-weight:600; color:{TEXT_SEC}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
         )
         v.addWidget(lbl)
         v.addWidget(widget)
@@ -831,92 +828,59 @@ class EmployeePage(QWidget):
     def _input(self, placeholder="", ltr=False):
         inp = QLineEdit()
         inp.setPlaceholderText(placeholder)
-        inp.setFixedHeight(42)
+        inp.setFixedHeight(36)
         if ltr:
             inp.setLayoutDirection(Qt.LeftToRight)
             inp.setAlignment(Qt.AlignLeft)
-        inp.setStyleSheet(self._input_qss())
+        inp.setStyleSheet(_input_qss())
         return inp
 
     def _num(self):
         inp = QLineEdit()
         inp.setValidator(QDoubleValidator(0, 100_000_000, 2))
-        inp.setFixedHeight(42)
+        inp.setFixedHeight(36)
         inp.setText("0")
         inp.setLayoutDirection(Qt.LeftToRight)
         inp.setAlignment(Qt.AlignLeft)
-        inp.setStyleSheet(self._input_qss())
+        inp.setStyleSheet(_input_qss())
         return inp
-
-    def _input_qss(self):
-        return f"""
-            QLineEdit {{
-                background:{SURFACE_2};
-                border:1.5px solid {BORDER};
-                border-radius:11px;
-                padding:0 14px;
-                font-size:12px;
-                color:{TEXT};
-                selection-background-color:{PRIMARY_BG};
-                selection-color:{PRIMARY_DK};
-                font-family:{FONT_FAMILY};
-            }}
-            QLineEdit:hover {{
-                background:white;
-                border-color:{BORDER_2};
-            }}
-            QLineEdit:focus {{
-                background:white;
-                border:1.5px solid {PRIMARY};
-            }}
-        """
 
     def _combo(self):
         c = QComboBox()
-        c.setFixedHeight(42)
+        c.setFixedHeight(36)
         c.setStyleSheet(f"""
             QComboBox {{
-                background:{SURFACE_2};
-                border:1.5px solid {BORDER};
-                border-radius:11px;
-                padding:0 14px;
-                font-size:12px;
+                background:{SURFACE};
+                border:1px solid {BORDER_2};
+                border-radius:{RADIUS};
+                padding:0 12px;
+                font-size:12.5px;
                 color:{TEXT};
+                font-family:{FONT_FAMILY};
             }}
-            QComboBox:hover {{
-                border-color:{BORDER_2};
-                background:white;
-            }}
-            QComboBox:focus {{
-                border:1.5px solid {PRIMARY};
-                background:white;
-            }}
-            QComboBox::drop-down {{
-                border:none;
-                width:30px;
-            }}
+            QComboBox:hover {{ border-color:{TEXT_MUTED}; }}
+            QComboBox:focus {{ border:1px solid {PRIMARY}; }}
+            QComboBox::drop-down {{ border:none; width:26px; }}
             QComboBox::down-arrow {{
-                image:none;
-                width:0;
-                height:0;
+                image:none; width:0; height:0;
                 border-left:4px solid transparent;
                 border-right:4px solid transparent;
                 border-top:5px solid {TEXT_MUTED};
-                margin-right:10px;
+                margin-right:8px;
             }}
             QComboBox QAbstractItemView {{
                 background:white;
                 border:1px solid {BORDER};
-                border-radius:10px;
-                padding:6px;
+                border-radius:{RADIUS};
+                padding:4px;
                 selection-background-color:{PRIMARY_BG};
                 selection-color:{PRIMARY};
                 outline:none;
             }}
             QComboBox QAbstractItemView::item {{
-                padding:9px 12px;
-                border-radius:6px;
-                min-height:22px;
+                padding:7px 10px;
+                border-radius:3px;
+                min-height:20px;
             }}
         """)
         return c
@@ -947,14 +911,20 @@ class EmployeePage(QWidget):
         if self.shift_combo.count():
             self.shift_combo.setCurrentIndex(0)
 
+    def _new_employee(self):
+        self._editing_id = None
+        self._clear_form()
+        self._load_shifts()
+        self.form_title.setText("موظف جديد")
+        self.form_subtitle.setText("إضافة سجل موظف جديد")
+        self.btn_save.setText("حفظ الموظف")
+        self.btn_files.setVisible(False)
+        self.stack.setCurrentWidget(self.form_page)
+
     def _cancel_form(self):
         self._editing_id = None
         self._clear_form()
-        self.form_title.setText("موظف جديد")
-        self.form_subtitle.setText("إضافة سجل موظف جديد")
-        self.btn_save.setText("💾  حفظ الموظف")
-        self.btn_cancel.setVisible(False)
-        self.btn_files.setVisible(False)
+        self.stack.setCurrentWidget(self.list_page)
 
     # ========================================================
     #                         Load
@@ -1008,21 +978,23 @@ class EmployeePage(QWidget):
             self.table.insertRow(i)
             is_active = (r["active"] or 0) == 1
 
-            # Employee cell (name + code)
+            # Employee cell
             emp = QWidget()
             emp.setStyleSheet("background:transparent;")
             ev = QVBoxLayout(emp)
             ev.setContentsMargins(6, 3, 6, 3)
-            ev.setSpacing(3)
+            ev.setSpacing(2)
 
             n = QLabel(r["name"] or "—")
             n.setStyleSheet(
-                f"font-size:12.5px; font-weight:800; "
-                f"color:{TEXT if is_active else TEXT_MUTED}; background:transparent;"
+                f"font-size:12.5px; font-weight:700; "
+                f"color:{TEXT if is_active else TEXT_MUTED}; "
+                f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
             )
             c = QLabel(r["code"] or "")
             c.setStyleSheet(
-                f"font-size:10.5px; color:{TEXT_MUTED}; background:transparent;"
+                f"font-size:10.5px; color:{TEXT_MUTED}; "
+                f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
             )
             ev.addWidget(n)
             ev.addWidget(c)
@@ -1056,28 +1028,12 @@ class EmployeePage(QWidget):
             sl.setContentsMargins(0, 0, 0, 0)
             sl.setAlignment(Qt.AlignCenter)
 
-            badge = QLabel("●  نشط" if is_active else "●  موقوف")
+            badge = QLabel("نشط" if is_active else "موقوف")
             badge.setAlignment(Qt.AlignCenter)
             if is_active:
-                badge.setStyleSheet(f"""
-                    background:{SUCCESS_BG};
-                    color:{SUCCESS};
-                    border:1px solid {SUCCESS_BRD};
-                    padding:6px 14px;
-                    border-radius:12px;
-                    font-weight:800;
-                    font-size:10.5px;
-                """)
+                badge.setStyleSheet(_badge_style(SUCCESS, SUCCESS_BG, SUCCESS_BRD, size=11, pad="3px 12px"))
             else:
-                badge.setStyleSheet(f"""
-                    background:{DANGER_BG};
-                    color:{DANGER};
-                    border:1px solid {DANGER_BRD};
-                    padding:6px 14px;
-                    border-radius:12px;
-                    font-weight:800;
-                    font-size:10.5px;
-                """)
+                badge.setStyleSheet(_badge_style(DANGER, DANGER_BG, DANGER_BRD, size=11, pad="3px 12px"))
             sl.addWidget(badge)
             self.table.setCellWidget(i, 6, status)
 
@@ -1089,19 +1045,19 @@ class EmployeePage(QWidget):
             al.setSpacing(5)
             al.setAlignment(Qt.AlignCenter)
 
-            btn_edit = self._icon_btn("✎", PRIMARY, PRIMARY_BG, PRIMARY_BRD, "تعديل الموظف")
+            btn_edit = self._icon_btn("تعديل", PRIMARY, "تعديل الموظف")
             btn_edit.clicked.connect(lambda _, eid=r["id"]: self._edit(eid))
 
-            btn_files = self._icon_btn("📎", INFO, INFO_BG, INFO_BRD, "ملفات الموظف")
+            btn_files = self._icon_btn("ملفات", INFO, "ملفات الموظف")
             btn_files.clicked.connect(lambda _, eid=r["id"]: self._open_files_by_id(eid))
 
             if is_active:
-                btn_toggle = self._icon_btn("⏸", WARNING, WARNING_BG, WARNING_BRD, "إيقاف الموظف")
+                btn_toggle = self._icon_btn("إيقاف", WARNING, "إيقاف الموظف")
             else:
-                btn_toggle = self._icon_btn("▶", SUCCESS, SUCCESS_BG, SUCCESS_BRD, "تفعيل الموظف")
+                btn_toggle = self._icon_btn("تفعيل", SUCCESS, "تفعيل الموظف")
             btn_toggle.clicked.connect(lambda _, eid=r["id"]: self._toggle_status(eid))
 
-            btn_del = self._icon_btn("✕", DANGER, DANGER_BG, DANGER_BRD, "حذف الموظف")
+            btn_del = self._icon_btn("حذف", DANGER, "حذف الموظف")
             btn_del.clicked.connect(lambda _, eid=r["id"]: self._delete(eid))
 
             al.addWidget(btn_edit)
@@ -1110,9 +1066,10 @@ class EmployeePage(QWidget):
             al.addWidget(btn_del)
             self.table.setCellWidget(i, 7, actions)
 
-    def _icon_btn(self, text, color, hover_bg, border_color, tooltip=""):
+    def _icon_btn(self, text, color, tooltip=""):
         btn = QPushButton(text)
-        btn.setFixedSize(34, 32)
+        btn.setFixedHeight(26)
+        btn.setMinimumWidth(50)
         btn.setCursor(Qt.PointingHandCursor)
         if tooltip:
             btn.setToolTip(tooltip)
@@ -1121,17 +1078,17 @@ class EmployeePage(QWidget):
                 background:{SURFACE};
                 color:{color};
                 border:1px solid {BORDER_2};
-                border-radius:9px;
-                font-size:12.5px;
-                font-weight:900;
+                border-radius:{RADIUS};
+                padding:0 10px;
+                font-size:11px;
+                font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
             QPushButton:hover {{
-                background:{hover_bg};
-                border-color:{border_color};
+                background:{SURFACE_3};
+                border-color:{color};
             }}
-            QPushButton:pressed {{
-                background:{hover_bg};
-            }}
+            QPushButton:pressed {{ background:{SURFACE_2}; }}
         """)
         return btn
 
@@ -1213,6 +1170,7 @@ class EmployeePage(QWidget):
             return
 
         self._editing_id = emp_id
+        self._load_shifts()
         self.code.setText(r["code"] or "")
         self.name.setText(r["name"] or "")
         self.dept.setText(r["department"] or "")
@@ -1233,11 +1191,11 @@ class EmployeePage(QWidget):
             if idx >= 0:
                 self.shift_combo.setCurrentIndex(idx)
 
-        self.form_title.setText("✎  تعديل موظف")
+        self.form_title.setText("تعديل موظف")
         self.form_subtitle.setText(f"{r['name']}  ·  {r['code']}")
-        self.btn_save.setText("💾  حفظ التعديلات")
-        self.btn_cancel.setVisible(True)
+        self.btn_save.setText("حفظ التعديلات")
         self.btn_files.setVisible(True)
+        self.stack.setCurrentWidget(self.form_page)
 
     def _toggle_status(self, emp_id):
         r = get_employee(emp_id)
@@ -1268,7 +1226,7 @@ class EmployeePage(QWidget):
         msg = QMessageBox(self)
         msg.setWindowTitle("تأكيد الحذف")
         msg.setText(f"حذف الموظف «{r['name']}» نهائياً؟")
-        msg.setInformativeText("⚠️ سيتم حذف الموظف من النظام، لكن ملفاته ستبقى في الفولدر.")
+        msg.setInformativeText("سيتم حذف الموظف من النظام، لكن ملفاته ستبقى في الفولدر.")
         msg.setIcon(QMessageBox.Warning)
         msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         msg.button(QMessageBox.Yes).setText("حذف نهائي")
@@ -1308,7 +1266,7 @@ class EmployeeFilesDialog(QDialog):
 
         self.setLayoutDirection(Qt.RightToLeft)
         self.setWindowTitle(f"ملفات الموظف - {employee_name}")
-        self.setMinimumSize(760, 600)
+        self.setMinimumSize(740, 580)
         self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
 
         self._build_ui()
@@ -1316,197 +1274,131 @@ class EmployeeFilesDialog(QDialog):
 
     def _build_ui(self):
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 24, 24, 24)
-        v.setSpacing(16)
+        v.setContentsMargins(22, 22, 22, 22)
+        v.setSpacing(14)
 
-        # Header
         head = QFrame()
         head.setObjectName("filesHeader")
         head.setStyleSheet(f"""
             QFrame#filesHeader {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
             }}
         """)
-        apply_shadow(head, blur=20, y_offset=4, alpha=60)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(22, 18, 22, 18)
-        hl.setSpacing(14)
-
-        icon = QLabel("📁")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(50, 50)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:14px;
-                font-size:22px;
-            }}
-        """)
-        hl.addWidget(icon)
+        hl.setContentsMargins(18, 14, 18, 14)
+        hl.setSpacing(12)
 
         tbox = QVBoxLayout()
-        tbox.setSpacing(3)
+        tbox.setSpacing(2)
 
         title = QLabel(f"ملفات: {self.employee_name}")
-        title.setStyleSheet("font-size:16px; font-weight:900; color:white; background:transparent;")
+        title.setStyleSheet(
+            f"font-size:15px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
+        )
         tbox.addWidget(title)
 
         sub = QLabel("إدارة مستندات وملفات الموظف")
-        sub.setStyleSheet("font-size:10.5px; color:#9db3cf; background:transparent;")
+        sub.setStyleSheet(
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none;"
+        )
         tbox.addWidget(sub)
         hl.addLayout(tbox)
         hl.addStretch()
 
         code_lbl = QLabel(f"كود: {self.employee_code}")
-        code_lbl.setStyleSheet(f"""
-            background: rgba(59, 91, 253, 0.15); color:#c7d2fe;
-            padding:7px 15px; border-radius:13px;
-            font-size:11.5px; font-weight:800;
-            border:1px solid rgba(59, 91, 253, 0.35);
-        """)
+        code_lbl.setStyleSheet(_badge_style(TEXT_SEC, SURFACE_3, BORDER, size=11, pad="4px 12px"))
         hl.addWidget(code_lbl)
         v.addWidget(head)
 
-        # Folder path
         path_box = QFrame()
         path_box.setStyleSheet(f"""
             QFrame {{
-                background:{SURFACE};
+                background:{SURFACE_2};
                 border:1px solid {BORDER};
-                border-radius:11px;
+                border-radius:{RADIUS};
             }}
         """)
         pl = QHBoxLayout(path_box)
-        pl.setContentsMargins(15, 11, 15, 11)
-        pl.setSpacing(9)
-
-        folder_icon = QLabel("📂")
-        folder_icon.setStyleSheet("font-size:15px; background:transparent;")
-        pl.addWidget(folder_icon)
+        pl.setContentsMargins(14, 10, 14, 10)
+        pl.setSpacing(8)
 
         path_lbl = QLabel(f"{self.folder.absolute()}")
         path_lbl.setStyleSheet(
-            f"font-size:11.5px; color:{TEXT_SEC}; background:transparent; "
-            f"font-family: Consolas, monospace;"
+            f"font-size:11px; color:{TEXT_SEC}; background:transparent; "
+            f"font-family: Consolas, monospace; border:none;"
         )
         path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
         pl.addWidget(path_lbl, 1)
         v.addWidget(path_box)
 
-        # Action buttons
         actions = QHBoxLayout()
-        actions.setSpacing(10)
+        actions.setSpacing(8)
 
-        btn_upload = QPushButton("📤  رفع ملفات")
-        btn_upload.setFixedHeight(42)
+        btn_upload = QPushButton("رفع ملفات")
+        btn_upload.setFixedHeight(36)
         btn_upload.setCursor(Qt.PointingHandCursor)
-        btn_upload.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_HOV});
-                color:white; border:none;
-                border-radius:11px; padding:0 22px;
-                font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4d6bff, stop:1 {PRIMARY_HOV});
-            }}
-        """)
+        btn_upload.setStyleSheet(_primary_btn_style(12))
         btn_upload.clicked.connect(self._upload)
         actions.addWidget(btn_upload)
 
-        btn_scan = QPushButton("🖨  مسح ضوئي")
-        btn_scan.setFixedHeight(42)
+        btn_scan = QPushButton("مسح ضوئي")
+        btn_scan.setFixedHeight(36)
         btn_scan.setCursor(Qt.PointingHandCursor)
-        btn_scan.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
-                color:white; border:none;
-                border-radius:11px; padding:0 22px;
-                font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{ background:{SUCCESS_HOV}; }}
-        """)
+        btn_scan.setStyleSheet(_success_btn_style(12))
         btn_scan.clicked.connect(self._scan)
         actions.addWidget(btn_scan)
 
         actions.addStretch()
 
-        btn_open_folder = QPushButton("📂  فتح المجلد")
-        btn_open_folder.setFixedHeight(42)
+        btn_open_folder = QPushButton("فتح المجلد")
+        btn_open_folder.setFixedHeight(36)
         btn_open_folder.setCursor(Qt.PointingHandCursor)
-        btn_open_folder.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 20px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-                color:{TEXT};
-            }}
-        """)
+        btn_open_folder.setStyleSheet(_secondary_btn_style(12))
         btn_open_folder.clicked.connect(self._open_folder)
         actions.addWidget(btn_open_folder)
 
         v.addLayout(actions)
 
-        # Files list
         self.list = QListWidget()
         self.list.setStyleSheet(f"""
             QListWidget {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:13px;
-                padding:10px;
+                border-radius:{RADIUS};
+                padding:6px;
                 font-size:12.5px;
                 color:{TEXT};
                 outline:none;
+                font-family:{FONT_FAMILY};
             }}
             QListWidget::item {{
-                padding:14px 16px;
-                border-radius:9px;
+                padding:12px 14px;
+                border-radius:{RADIUS};
                 border-bottom:1px solid {DIVIDER};
-                margin:3px 0;
+                margin:2px 0;
             }}
             QListWidget::item:selected {{
                 background:{PRIMARY_BG};
                 color:{PRIMARY_DK};
                 border:1px solid {PRIMARY_BRD};
             }}
-            QListWidget::item:hover {{
-                background:{SURFACE_2};
-            }}
+            QListWidget::item:hover {{ background:{SURFACE_2}; }}
         """)
         self.list.itemDoubleClicked.connect(self._open_file)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._file_menu)
         v.addWidget(self.list, 1)
 
-        # Footer
         footer = QHBoxLayout()
         footer.addStretch()
         btn_close = QPushButton("إغلاق")
-        btn_close.setFixedHeight(40)
+        btn_close.setFixedHeight(36)
         btn_close.setCursor(Qt.PointingHandCursor)
-        btn_close.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 28px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-            }}
-        """)
+        btn_close.setStyleSheet(_secondary_btn_style(12))
         btn_close.clicked.connect(self.accept)
         footer.addWidget(btn_close)
         v.addLayout(footer)
@@ -1525,7 +1417,7 @@ class EmployeeFilesDialog(QDialog):
         for f in files:
             size_kb = (f["file_size"] or 0) / 1024
             size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.2f} MB"
-            text = f"📄   {f['file_name']}     ·     {size_str}"
+            text = f"{f['file_name']}          {size_str}"
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, dict(f))
             self.list.addItem(item)
@@ -1562,7 +1454,7 @@ class EmployeeFilesDialog(QDialog):
                 QMessageBox.warning(self, "خطأ", f"فشل رفع {src}:\n{e}")
 
         if count:
-            QMessageBox.information(self, "تم", f"تم رفع {count} ملف ✅")
+            QMessageBox.information(self, "تم", f"تم رفع {count} ملف")
             self._refresh_list()
 
     def _scan(self):
@@ -1605,14 +1497,15 @@ class EmployeeFilesDialog(QDialog):
             QMenu {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:10px;
-                padding:6px;
+                border-radius:{RADIUS};
+                padding:4px;
             }}
             QMenu::item {{
-                padding:9px 24px 9px 16px;
-                border-radius:7px;
+                padding:8px 22px 8px 14px;
+                border-radius:3px;
                 font-size:12px;
                 color:{TEXT};
+                font-family:{FONT_FAMILY};
             }}
             QMenu::item:selected {{
                 background:{PRIMARY_BG};
@@ -1621,14 +1514,14 @@ class EmployeeFilesDialog(QDialog):
             QMenu::separator {{
                 height:1px;
                 background:{DIVIDER};
-                margin:5px 8px;
+                margin:4px 6px;
             }}
         """)
 
-        act_open = QAction("📂  فتح", self)
+        act_open = QAction("فتح", self)
         act_open.triggered.connect(lambda: self._open_file(item))
 
-        act_del = QAction("🗑  حذف", self)
+        act_del = QAction("حذف", self)
         act_del.triggered.connect(lambda: self._delete_file(data))
 
         menu.addAction(act_open)
@@ -1666,170 +1559,116 @@ class ScanDialog(QDialog):
 
         self.setLayoutDirection(Qt.RightToLeft)
         self.setWindowTitle("المسح الضوئي")
-        self.setMinimumSize(620, 560)
+        self.setMinimumSize(600, 540)
         self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
 
         self._build_ui()
 
     def _build_ui(self):
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 24, 24, 24)
-        v.setSpacing(16)
+        v.setContentsMargins(22, 22, 22, 22)
+        v.setSpacing(14)
 
-        # Header
         head = QFrame()
+        head.setObjectName("scanHeader")
         head.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
+            QFrame#scanHeader {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
             }}
         """)
-        apply_shadow(head, blur=20, y_offset=4, alpha=60)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(20, 16, 20, 16)
-        hl.setSpacing(14)
-
-        icon = QLabel("🖨")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(48, 48)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:13px;
-                font-size:21px;
-            }}
-        """)
-        hl.addWidget(icon)
+        hl.setContentsMargins(18, 14, 18, 14)
+        hl.setSpacing(12)
 
         tbox = QVBoxLayout()
-        tbox.setSpacing(3)
+        tbox.setSpacing(2)
 
         title = QLabel("المسح الضوئي / إضافة صورة")
-        title.setStyleSheet("font-size:16px; font-weight:900; color:white; background:transparent;")
+        title.setStyleSheet(
+            f"font-size:15px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; font-family:{FONT_FAMILY}; border:none;"
+        )
         tbox.addWidget(title)
 
         sub = QLabel("اختر صورة من الجهاز أو استخدم السكانر")
-        sub.setStyleSheet("font-size:10.5px; color:#9db3cf; background:transparent;")
+        sub.setStyleSheet(
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none;"
+        )
         tbox.addWidget(sub)
         hl.addLayout(tbox, 1)
         v.addWidget(head)
 
-        # Info box
         info_box = QFrame()
         info_box.setStyleSheet(f"""
             QFrame {{
                 background:{INFO_BG};
                 border:1px solid {INFO_BRD};
-                border-radius:11px;
+                border-radius:{RADIUS};
             }}
         """)
         il = QHBoxLayout(info_box)
-        il.setContentsMargins(15, 12, 15, 12)
+        il.setContentsMargins(14, 11, 14, 11)
         il.setSpacing(10)
-
-        info_icon = QLabel("💡")
-        info_icon.setStyleSheet("font-size:17px; background:transparent;")
-        il.addWidget(info_icon)
 
         info = QLabel(
             "لسكانر حقيقي: ثبّت <b>pywin32</b> + <b>pillow</b> على ويندوز، "
             "أو <b>python-sane</b> على لينكس/ماك."
         )
-        info.setStyleSheet(f"font-size:11.5px; color:{INFO}; background:transparent;")
+        info.setStyleSheet(
+            f"font-size:11.5px; color:{INFO}; background:transparent; "
+            f"font-family:{FONT_FAMILY}; border:none;"
+        )
         info.setWordWrap(True)
         il.addWidget(info, 1)
         v.addWidget(info_box)
 
-        # Preview
         self.preview = QLabel("— لا توجد صورة —")
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setMinimumHeight(240)
+        self.preview.setMinimumHeight(220)
         self.preview.setStyleSheet(f"""
             background:{SURFACE};
             border:2px dashed {BORDER_2};
-            border-radius:14px;
+            border-radius:{RADIUS};
             color:{TEXT_MUTED};
             font-size:13px;
-            font-weight:700;
+            font-weight:600;
+            font-family:{FONT_FAMILY};
         """)
         v.addWidget(self.preview, 1)
 
-        # Buttons
         btns = QHBoxLayout()
-        btns.setSpacing(10)
+        btns.setSpacing(8)
 
-        btn_pick = QPushButton("📂  اختر صورة")
-        btn_pick.setFixedHeight(44)
+        btn_pick = QPushButton("اختر صورة")
+        btn_pick.setFixedHeight(36)
         btn_pick.setCursor(Qt.PointingHandCursor)
-        btn_pick.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 22px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-                color:{TEXT};
-            }}
-        """)
+        btn_pick.setStyleSheet(_secondary_btn_style(12))
         btn_pick.clicked.connect(self._pick_image)
         btns.addWidget(btn_pick)
 
-        btn_scan_device = QPushButton("🖨  مسح من السكانر")
-        btn_scan_device.setFixedHeight(44)
+        btn_scan_device = QPushButton("مسح من السكانر")
+        btn_scan_device.setFixedHeight(36)
         btn_scan_device.setCursor(Qt.PointingHandCursor)
-        btn_scan_device.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_HOV});
-                color:white; border:none;
-                border-radius:11px; padding:0 22px;
-                font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4d6bff, stop:1 {PRIMARY_HOV});
-            }}
-        """)
+        btn_scan_device.setStyleSheet(_primary_btn_style(12))
         btn_scan_device.clicked.connect(self._scan_device)
         btns.addWidget(btn_scan_device)
 
         btns.addStretch()
 
-        btn_save = QPushButton("💾  حفظ")
-        btn_save.setFixedHeight(44)
+        btn_save = QPushButton("حفظ")
+        btn_save.setFixedHeight(36)
         btn_save.setCursor(Qt.PointingHandCursor)
-        btn_save.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
-                color:white; border:none;
-                border-radius:11px; padding:0 28px;
-                font-weight:900; font-size:12.5px;
-            }}
-            QPushButton:hover {{ background:{SUCCESS_HOV}; }}
-        """)
+        btn_save.setStyleSheet(_success_btn_style(12))
         btn_save.clicked.connect(self._save)
         btns.addWidget(btn_save)
 
         btn_close = QPushButton("إلغاء")
-        btn_close.setFixedHeight(44)
+        btn_close.setFixedHeight(36)
         btn_close.setCursor(Qt.PointingHandCursor)
-        btn_close.setStyleSheet(f"""
-            QPushButton {{
-                background:transparent; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
-                padding:0 22px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2};
-                border-color:{TEXT_MUTED};
-            }}
-        """)
+        btn_close.setStyleSheet(_secondary_btn_style(12))
         btn_close.clicked.connect(self.reject)
         btns.addWidget(btn_close)
 
@@ -1849,17 +1688,17 @@ class ScanDialog(QDialog):
             from PySide6.QtGui import QPixmap
             pix = QPixmap(path)
             if not pix.isNull():
-                scaled = pix.scaled(500, 280, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled = pix.scaled(480, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.preview.setPixmap(scaled)
                 self.preview.setStyleSheet(f"""
                     background:{SURFACE};
                     border:1px solid {BORDER};
-                    border-radius:14px;
+                    border-radius:{RADIUS};
                 """)
             else:
-                self.preview.setText("⚠️ تعذر تحميل الصورة")
+                self.preview.setText("تعذر تحميل الصورة")
         except Exception as e:
-            self.preview.setText(f"⚠️ {e}")
+            self.preview.setText(f"خطأ: {e}")
 
     def _scan_device(self):
         try:
@@ -1873,7 +1712,7 @@ class ScanDialog(QDialog):
                     f.write(img_bytes)
                 self.selected_path = str(temp_path)
                 self._show_preview(str(temp_path))
-                QMessageBox.information(self, "تم", "تم المسح الضوئي ✅")
+                QMessageBox.information(self, "تم", "تم المسح الضوئي")
                 return
         except ImportError:
             pass

@@ -41,6 +41,7 @@ def init_db():
             sick_leave_policy TEXT,
             overtime_rate REAL DEFAULT 1.0,
             work_days TEXT,
+            overtime_cutoff TEXT DEFAULT '02:00',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -210,6 +211,7 @@ def init_db():
     conn.close()
 
     migrate_employees()
+    migrate_shifts()
     migrate_files_table()
     migrate_device_users_table()
 
@@ -250,6 +252,29 @@ def migrate_employees():
     if added:
         conn.commit()
         print("[Migration] Employees table updated successfully ✅")
+
+    conn.close()
+
+
+def migrate_shifts():
+    """
+    إضافة عمود overtime_cutoff لجدول shifts (وقت قطع الإضافي بعد منتصف الليل).
+    القيمة الافتراضية: '02:00'
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    existing_cols = [r[1] for r in cur.execute("PRAGMA table_info(shifts)").fetchall()]
+
+    if "overtime_cutoff" not in existing_cols:
+        try:
+            cur.execute(
+                "ALTER TABLE shifts ADD COLUMN overtime_cutoff TEXT DEFAULT '02:00'"
+            )
+            conn.commit()
+            print("[Migration] Added column: shifts.overtime_cutoff ✅")
+        except sqlite3.OperationalError as e:
+            print(f"[Migration] Skipped shifts.overtime_cutoff: {e}")
 
     conn.close()
 
@@ -513,15 +538,16 @@ def count_active_employees():
 #                       Shifts
 # ============================================================
 def add_shift(name, shift_type, work_hours, start_time, end_time,
-              sick_leave, overtime_rate, work_days, deductions):
+              sick_leave, overtime_rate, work_days, deductions,
+              overtime_cutoff="02:00"):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""INSERT INTO shifts
         (name, shift_type, work_hours, start_time, end_time,
-         sick_leave_policy, overtime_rate, work_days)
-        VALUES (?,?,?,?,?,?,?,?)""",
+         sick_leave_policy, overtime_rate, work_days, overtime_cutoff)
+        VALUES (?,?,?,?,?,?,?,?,?)""",
         (name, shift_type, work_hours, start_time, end_time,
-         sick_leave, overtime_rate, work_days))
+         sick_leave, overtime_rate, work_days, overtime_cutoff))
     shift_id = cur.lastrowid
 
     for d in deductions:
@@ -568,15 +594,16 @@ def delete_shift(shift_id):
 
 
 def update_shift(shift_id, name, shift_type, work_hours, start_time, end_time,
-                 sick_leave, overtime_rate, work_days, deductions):
+                 sick_leave, overtime_rate, work_days, deductions,
+                 overtime_cutoff="02:00"):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""UPDATE shifts SET
         name=?, shift_type=?, work_hours=?, start_time=?, end_time=?,
-        sick_leave_policy=?, overtime_rate=?, work_days=?
+        sick_leave_policy=?, overtime_rate=?, work_days=?, overtime_cutoff=?
         WHERE id=?""",
         (name, shift_type, work_hours, start_time, end_time,
-         sick_leave, overtime_rate, work_days, shift_id))
+         sick_leave, overtime_rate, work_days, overtime_cutoff, shift_id))
 
     cur.execute("DELETE FROM shift_deductions WHERE shift_id=?", (shift_id,))
     for d in deductions:
@@ -857,10 +884,21 @@ def delete_raw_punches_range(employee_id, from_date, to_date):
 
 
 def delete_all_raw_punches():
+    """حذف كل البصمات الخام + VACUUM لضمان التنظيف الكامل."""
     conn = get_connection()
-    conn.execute("DELETE FROM raw_punches")
-    conn.commit()
-    conn.close()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM raw_punches")
+        conn.commit()
+        # VACUUM لتفريغ المساحة وإغلاق أي معاملة معلّقة
+        try:
+            cur.execute("VACUUM")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # VACUUM قد يفشل لو فيه معاملة مفتوحة - نتجاهله
+            pass
+    finally:
+        conn.close()
 
 
 def count_raw_punches():

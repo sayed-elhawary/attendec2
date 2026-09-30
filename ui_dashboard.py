@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel,
     QStackedWidget, QFrame, QButtonGroup, QMessageBox,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QGridLayout,
-    QGraphicsDropShadowEffect, QScrollArea
+    QScrollArea
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QColor
@@ -20,61 +20,91 @@ from database import (
 
 
 # ============================================================
-#                نظام الألوان
+#     نظام ألوان مسطح وهادئ (تصميم برامج مكتبية / إدارية)
 # ============================================================
-BG          = "#f1f5f9"
+BG          = "#eef0f3"
 SURFACE     = "#ffffff"
-SURFACE_2   = "#f8fafc"
-BORDER      = "#e2e8f0"
-BORDER_2    = "#cbd5e1"
-DIVIDER     = "#eef2f7"
+SURFACE_2   = "#f8f9fa"
+SURFACE_3   = "#f1f3f5"
+BORDER      = "#d8dce1"
+BORDER_2    = "#c3c9d0"
+DIVIDER     = "#e8ebee"
 
-TEXT        = "#0f172a"
-TEXT_SEC    = "#475569"
-TEXT_MUTED  = "#94a3b8"
+TEXT        = "#1f2933"
+TEXT_SEC    = "#4b5563"
+TEXT_MUTED  = "#7b8794"
 
-NAVY        = "#0b1729"
-NAVY_2      = "#132a4a"
-NAVY_3      = "#1e3a5f"
-NAVY_ACCENT = "#1e40af"
+PRIMARY     = "#1f4e8c"
+PRIMARY_HOV = "#1a4275"
+PRIMARY_DK  = "#153561"
+PRIMARY_BG  = "#e8eff8"
+PRIMARY_BRD = "#b6c8e0"
 
-PRIMARY     = "#2563eb"
-PRIMARY_HOV = "#1d4ed8"
-PRIMARY_DK  = "#1e40af"
-PRIMARY_BG  = "#eff6ff"
-PRIMARY_BRD = "#bfdbfe"
+SUCCESS     = "#2f7d4f"
+SUCCESS_HOV = "#276a43"
+SUCCESS_BG  = "#eaf4ee"
+SUCCESS_BRD = "#b9d9c5"
 
-SUCCESS     = "#059669"
-SUCCESS_BG  = "#ecfdf5"
-SUCCESS_BRD = "#a7f3d0"
+DANGER      = "#b3372f"
+DANGER_HOV  = "#992d26"
+DANGER_BG   = "#fbeceb"
+DANGER_BRD  = "#e6b9b5"
 
-DANGER      = "#dc2626"
-DANGER_BG   = "#fef2f2"
-DANGER_BRD  = "#fecaca"
+WARNING     = "#a86a12"
+WARNING_BG  = "#fbf3e4"
+WARNING_BRD = "#e6cf9f"
 
-WARNING     = "#d97706"
-WARNING_BG  = "#fffbeb"
-WARNING_BRD = "#fde68a"
+INFO        = "#2a6f8f"
+INFO_BG     = "#e9f2f6"
+INFO_BRD    = "#b5d2df"
 
-INFO        = "#0891b2"
-INFO_BG     = "#ecfeff"
-INFO_BRD    = "#a5f3fc"
+PURPLE      = "#5f4b8b"
+PURPLE_BG   = "#efecf5"
+PURPLE_BRD  = "#cfc6e0"
 
-PURPLE      = "#7c3aed"
-PURPLE_BG   = "#f5f3ff"
-PURPLE_BRD  = "#ddd6fe"
+GRAY        = "#616e7c"
+GRAY_BG     = "#f0f2f4"
+GRAY_BRD    = "#d8dce1"
 
 FONT_FAMILY = "Segoe UI, Tahoma, Arial, sans-serif"
 
+RADIUS = "4px"
 
-def apply_shadow(widget, blur=20, y_offset=4, alpha=35):
-    effect = QGraphicsDropShadowEffect(widget)
-    effect.setBlurRadius(blur)
-    effect.setXOffset(0)
-    effect.setYOffset(y_offset)
-    effect.setColor(QColor(15, 23, 42, alpha))
-    widget.setGraphicsEffect(effect)
-    return effect
+
+def _card_style(object_name):
+    return f"""
+        QFrame#{object_name} {{
+            background:{SURFACE};
+            border:1px solid {BORDER};
+            border-radius:{RADIUS};
+        }}
+    """
+
+
+def _primary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{PRIMARY}; color:white;
+            border:1px solid {PRIMARY}; border-radius:{RADIUS};
+            padding:0 16px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{PRIMARY_HOV}; border-color:{PRIMARY_HOV}; }}
+        QPushButton:pressed {{ background:{PRIMARY_DK}; border-color:{PRIMARY_DK}; }}
+    """
+
+
+def _secondary_btn_style(size=12):
+    return f"""
+        QPushButton {{
+            background:{SURFACE}; color:{TEXT};
+            border:1px solid {BORDER_2}; border-radius:{RADIUS};
+            padding:0 16px; font-weight:600; font-size:{size}px;
+            font-family:{FONT_FAMILY};
+        }}
+        QPushButton:hover {{ background:{SURFACE_3}; border-color:{TEXT_MUTED}; }}
+        QPushButton:pressed {{ background:{DIVIDER}; }}
+    """
 
 
 # ============================================================
@@ -85,51 +115,36 @@ class ChangePasswordDialog(QDialog):
         super().__init__(parent)
         self.setLayoutDirection(Qt.RightToLeft)
         self.setWindowTitle("تغيير كلمة المرور")
-        self.setFixedWidth(460)
+        self.setFixedWidth(440)
         self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
         self.username = username
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(24, 24, 24, 24)
-        v.setSpacing(16)
+        v.setContentsMargins(22, 22, 22, 22)
+        v.setSpacing(14)
 
         # Header
         head = QFrame()
-        head.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {NAVY}, stop:1 {NAVY_2});
-                border-radius:12px;
-            }}
-        """)
-        apply_shadow(head, blur=14, y_offset=3)
+        head.setObjectName("pwHeader")
+        head.setStyleSheet(_card_style("pwHeader"))
 
         hh = QHBoxLayout(head)
-        hh.setContentsMargins(16, 14, 16, 14)
+        hh.setContentsMargins(16, 12, 16, 12)
         hh.setSpacing(12)
-
-        icon = QLabel("🔒")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(42, 42)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background:{NAVY_3}; color:white;
-                border:1px solid {NAVY_ACCENT}; border-radius:11px;
-                font-size:18px;
-            }}
-        """)
-        hh.addWidget(icon)
 
         tbox = QVBoxLayout()
         tbox.setSpacing(2)
+
         t = QLabel("تغيير كلمة المرور")
         t.setStyleSheet(
-            "font-size:15px; font-weight:900; color:white; background:transparent;"
+            f"font-size:15px; font-weight:700; color:{TEXT}; "
+            f"background:transparent; border:none;"
         )
         tbox.addWidget(t)
+
         s = QLabel(f"المستخدم: {username}")
         s.setStyleSheet(
-            "font-size:10px; color:#9db3cf; background:transparent;"
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; border:none;"
         )
         tbox.addWidget(s)
         hh.addLayout(tbox)
@@ -145,43 +160,25 @@ class ChangePasswordDialog(QDialog):
         v.addWidget(self._field("كلمة المرور الجديدة", self.new))
         v.addWidget(self._field("تأكيد كلمة المرور", self.new2))
 
-        v.addSpacing(8)
+        v.addSpacing(6)
 
         # أزرار
         btns = QHBoxLayout()
-        btns.setSpacing(9)
+        btns.setSpacing(8)
 
         btn_cancel = QPushButton("إلغاء")
-        btn_cancel.setFixedHeight(42)
+        btn_cancel.setFixedHeight(36)
         btn_cancel.setCursor(Qt.PointingHandCursor)
-        btn_cancel.setStyleSheet(f"""
-            QPushButton {{
-                background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER}; border-radius:10px;
-                padding:0 22px; font-weight:800; font-size:12px;
-            }}
-            QPushButton:hover {{
-                background:{SURFACE_2}; border-color:{BORDER_2};
-            }}
-        """)
+        btn_cancel.setStyleSheet(_secondary_btn_style(12))
         btn_cancel.clicked.connect(self.reject)
         btns.addWidget(btn_cancel)
 
         btns.addStretch()
 
-        btn_save = QPushButton("💾  حفظ")
-        btn_save.setFixedHeight(42)
+        btn_save = QPushButton("حفظ")
+        btn_save.setFixedHeight(36)
         btn_save.setCursor(Qt.PointingHandCursor)
-        btn_save.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 #047857);
-                color:white; border:none;
-                border-radius:10px; padding:0 26px;
-                font-weight:900; font-size:12px;
-            }}
-            QPushButton:hover {{ background:#047857; }}
-        """)
+        btn_save.setStyleSheet(_primary_btn_style(12))
         btn_save.clicked.connect(self._save)
         btns.addWidget(btn_save)
 
@@ -191,14 +188,16 @@ class ChangePasswordDialog(QDialog):
         inp = QLineEdit()
         inp.setPlaceholderText(placeholder)
         inp.setEchoMode(QLineEdit.Password)
-        inp.setFixedHeight(42)
+        inp.setFixedHeight(36)
         inp.setStyleSheet(f"""
             QLineEdit {{
-                background:{SURFACE_2}; border:1px solid {BORDER};
-                border-radius:10px; padding:0 13px;
-                font-size:12px; color:{TEXT};
+                background:{SURFACE}; border:1px solid {BORDER_2};
+                border-radius:{RADIUS}; padding:0 12px;
+                font-size:12.5px; color:{TEXT};
+                font-family:{FONT_FAMILY};
             }}
-            QLineEdit:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
+            QLineEdit:hover {{ border-color:{TEXT_MUTED}; }}
+            QLineEdit:focus {{ border:1px solid {PRIMARY}; }}
         """)
         return inp
 
@@ -207,10 +206,11 @@ class ChangePasswordDialog(QDialog):
         w.setStyleSheet("background:transparent;")
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
+        v.setSpacing(5)
         lbl = QLabel(label)
         lbl.setStyleSheet(
-            f"font-size:11px; font-weight:800; color:{TEXT_SEC}; background:transparent;"
+            f"font-size:11px; font-weight:600; color:{TEXT_SEC}; "
+            f"background:transparent; border:none;"
         )
         v.addWidget(lbl)
         v.addWidget(widget)
@@ -264,11 +264,10 @@ class Dashboard(QWidget):
     def _build_sidebar(self):
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(272)
+        sidebar.setFixedWidth(250)
         sidebar.setStyleSheet(f"""
             QFrame#sidebar {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
+                background:{PRIMARY};
                 border:none;
             }}
         """)
@@ -292,34 +291,35 @@ class Dashboard(QWidget):
         # Menu label
         v.addSpacing(14)
         menu_lbl = QLabel("القائمة الرئيسية")
-        menu_lbl.setStyleSheet("""
-            color:#64748b;
-            font-size:10px;
-            font-weight:800;
-            letter-spacing:1.5px;
-            padding:0 26px;
+        menu_lbl.setStyleSheet(f"""
+            color: rgba(255,255,255,0.55);
+            font-size:10.5px;
+            font-weight:700;
+            letter-spacing:1px;
+            padding:0 22px;
             background:transparent;
+            font-family:{FONT_FAMILY};
         """)
         v.addWidget(menu_lbl)
         v.addSpacing(10)
 
-        # Buttons (بدون badges)
+        # Buttons
         self.btn_group = QButtonGroup(self)
         self.btn_group.setExclusive(True)
 
         self.stack = QStackedWidget()
 
         pages_list = [
-            ("🏠", "لوحة التحكم",       self._make_home()),
-            ("🕐", "الشيفتات",          ShiftPage()),
-            ("👥", "الموظفين",          EmployeePage()),
-            ("✅", "الحضور والانصراف",   AttendancePage()),
-            ("💰", "المرتبات",          PayrollPage()),
-            ("🔌", "ربط البصمة",        DeviceConnectionPage()),
+            ("لوحة التحكم",       self._make_home()),
+            ("الشيفتات",          ShiftPage()),
+            ("الموظفين",          EmployeePage()),
+            ("الحضور والانصراف",  AttendancePage()),
+            ("المرتبات",          PayrollPage()),
+            ("ربط البصمة",        DeviceConnectionPage()),
         ]
 
-        for icon, label, widget in pages_list:
-            self._add_sidebar_btn(v, icon, label, widget)
+        for label, widget in pages_list:
+            self._add_sidebar_btn(v, label, widget)
 
         v.addStretch()
 
@@ -327,25 +327,26 @@ class Dashboard(QWidget):
         v.addWidget(self._divider())
         v.addSpacing(10)
 
-        btn_pw = self._make_action_btn("🔒", "تغيير كلمة المرور")
+        btn_pw = self._make_action_btn("تغيير كلمة المرور")
         btn_pw.clicked.connect(self._open_change_pw)
         v.addWidget(btn_pw)
 
-        btn_logout = self._make_action_btn("🚪", "تسجيل الخروج", danger=True)
+        btn_logout = self._make_action_btn("تسجيل الخروج", danger=True)
         btn_logout.clicked.connect(self._logout)
         v.addWidget(btn_logout)
 
-        v.addSpacing(12)
+        v.addSpacing(10)
 
         # Footer
-        footer = QLabel("v1.0  ·  © 2026")
+        footer = QLabel("v1.0  -  2026")
         footer.setAlignment(Qt.AlignCenter)
-        footer.setStyleSheet("""
-            color:#475569;
-            font-size:9.5px;
+        footer.setStyleSheet(f"""
+            color: rgba(255,255,255,0.4);
+            font-size:10px;
             background:transparent;
             padding:10px;
             letter-spacing:0.5px;
+            font-family:{FONT_FAMILY};
         """)
         v.addWidget(footer)
 
@@ -354,61 +355,75 @@ class Dashboard(QWidget):
     def _divider(self):
         d = QFrame()
         d.setFixedHeight(1)
-        d.setStyleSheet("background:rgba(255,255,255,0.06); margin:0 20px;")
+        d.setStyleSheet(
+            "background: rgba(255,255,255,0.1); border:none;"
+        )
         return d
 
     def _build_logo_section(self):
         wrap = QFrame()
         wrap.setStyleSheet("background:transparent;")
         wl = QVBoxLayout(wrap)
-        wl.setContentsMargins(22, 24, 22, 20)
-        wl.setSpacing(12)
+        wl.setContentsMargins(20, 22, 20, 18)
+        wl.setSpacing(10)
 
         # Logo container
         logo_container = QFrame()
-        logo_container.setFixedSize(84, 84)
-        logo_container.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(255,255,255,0.10),
-                    stop:1 rgba(255,255,255,0.03));
-                border: 1.5px solid rgba(255,255,255,0.14);
-                border-radius: 22px;
-            }
+        logo_container.setFixedSize(72, 72)
+        logo_container.setStyleSheet(f"""
+            QFrame {{
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.18);
+                border-radius: {RADIUS};
+            }}
         """)
-        apply_shadow(logo_container, blur=20, y_offset=4, alpha=60)
 
         lc_layout = QVBoxLayout(logo_container)
-        lc_layout.setContentsMargins(8, 8, 8, 8)
+        lc_layout.setContentsMargins(6, 6, 6, 6)
         lc_layout.setAlignment(Qt.AlignCenter)
 
         logo_label = QLabel()
         logo_label.setAlignment(Qt.AlignCenter)
-        logo_label.setStyleSheet("background:transparent;")
+        logo_label.setStyleSheet("background:transparent; border:none;")
 
         try:
             if os.path.exists("logo.png"):
                 pix = QPixmap("logo.png")
                 if not pix.isNull():
                     scaled = pix.scaled(
-                        66, 66, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                        56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation
                     )
                     logo_label.setPixmap(scaled)
                 else:
-                    logo_label.setText("⏱")
-                    logo_label.setStyleSheet(
-                        "font-size:42px; background:transparent; color:white;"
-                    )
+                    logo_label.setText("HR")
+                    logo_label.setStyleSheet(f"""
+                        font-size:22px;
+                        background:transparent;
+                        color:white;
+                        font-weight:700;
+                        font-family:{FONT_FAMILY};
+                        border:none;
+                    """)
             else:
-                logo_label.setText("⏱")
-                logo_label.setStyleSheet(
-                    "font-size:42px; background:transparent; color:white;"
-                )
+                logo_label.setText("HR")
+                logo_label.setStyleSheet(f"""
+                    font-size:22px;
+                    background:transparent;
+                    color:white;
+                    font-weight:700;
+                    font-family:{FONT_FAMILY};
+                    border:none;
+                """)
         except Exception:
-            logo_label.setText("⏱")
-            logo_label.setStyleSheet(
-                "font-size:42px; background:transparent; color:white;"
-            )
+            logo_label.setText("HR")
+            logo_label.setStyleSheet(f"""
+                font-size:22px;
+                background:transparent;
+                color:white;
+                font-weight:700;
+                font-family:{FONT_FAMILY};
+                border:none;
+            """)
 
         lc_layout.addWidget(logo_label)
         wl.addWidget(logo_container, 0, Qt.AlignCenter)
@@ -416,23 +431,27 @@ class Dashboard(QWidget):
         # الاسم
         title = QLabel("نظام الحضور")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("""
+        title.setStyleSheet(f"""
             color:white;
-            font-size:17px;
-            font-weight:900;
+            font-size:15px;
+            font-weight:700;
             background:transparent;
-            letter-spacing:0.5px;
+            letter-spacing:0.3px;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         wl.addWidget(title)
 
         sub = QLabel("والانصراف والمرتبات")
         sub.setAlignment(Qt.AlignCenter)
-        sub.setStyleSheet("""
-            color:#94a8c4;
+        sub.setStyleSheet(f"""
+            color: rgba(255,255,255,0.62);
             font-size:10.5px;
             background:transparent;
-            letter-spacing:0.3px;
+            letter-spacing:0.2px;
             font-weight:500;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         wl.addWidget(sub)
 
@@ -442,57 +461,62 @@ class Dashboard(QWidget):
         wrap = QFrame()
         wrap.setStyleSheet("background:transparent;")
         wl = QVBoxLayout(wrap)
-        wl.setContentsMargins(16, 16, 16, 16)
+        wl.setContentsMargins(14, 14, 14, 14)
         wl.setSpacing(0)
 
         card = QFrame()
-        card.setStyleSheet("""
-            QFrame {
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 14px;
-            }
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: {RADIUS};
+            }}
         """)
 
         h = QHBoxLayout(card)
-        h.setContentsMargins(12, 11, 12, 11)
-        h.setSpacing(11)
+        h.setContentsMargins(10, 9, 10, 9)
+        h.setSpacing(10)
 
         # Avatar
         avatar = QLabel(self.username[0].upper() if self.username else "؟")
         avatar.setAlignment(Qt.AlignCenter)
-        avatar.setFixedSize(40, 40)
+        avatar.setFixedSize(34, 34)
         avatar.setStyleSheet(f"""
             QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {PRIMARY}, stop:1 #3b82f6);
+                background: rgba(255,255,255,0.15);
                 color:white;
-                border-radius:20px;
-                font-size:16px;
-                font-weight:900;
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: {RADIUS};
+                font-size:14px;
+                font-weight:700;
+                font-family:{FONT_FAMILY};
             }}
         """)
         h.addWidget(avatar)
 
         # Info
         v = QVBoxLayout()
-        v.setSpacing(2)
+        v.setSpacing(1)
 
         name_lbl = QLabel(self.username)
-        name_lbl.setStyleSheet("""
+        name_lbl.setStyleSheet(f"""
             color:white;
-            font-size:12.5px;
-            font-weight:800;
+            font-size:12px;
+            font-weight:700;
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         v.addWidget(name_lbl)
 
-        role_lbl = QLabel("●  مسجل الدخول")
-        role_lbl.setStyleSheet("""
-            color:#4ade80;
-            font-size:9.5px;
+        role_lbl = QLabel("مسجل الدخول")
+        role_lbl.setStyleSheet(f"""
+            color: rgba(255,255,255,0.62);
+            font-size:10px;
             background:transparent;
-            font-weight:700;
+            font-weight:500;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         v.addWidget(role_lbl)
 
@@ -502,43 +526,20 @@ class Dashboard(QWidget):
         wl.addWidget(card)
         return wrap
 
-    def _add_sidebar_btn(self, layout, icon, label, widget):
-        """إضافة زر جانبي (بدون badge رقمي)"""
-        btn = QPushButton()
+    def _add_sidebar_btn(self, layout, label, widget):
+        """إضافة زر جانبي مع تباعد واضح بين الأزرار."""
+        # فراغ قبل الزر لجعل التباعد أوضح
+        spacer = QWidget()
+        spacer.setFixedHeight(4)
+        spacer.setStyleSheet("background:transparent;")
+        layout.addWidget(spacer)
+
+        btn = QPushButton(label)
         btn.setObjectName("sidebar_btn")
         btn.setCheckable(True)
-        btn.setMinimumHeight(48)
+        btn.setMinimumHeight(40)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setStyleSheet(self._sidebar_btn_style())
-
-        h = QHBoxLayout(btn)
-        h.setContentsMargins(18, 0, 16, 0)
-        h.setSpacing(10)
-
-        ic = QLabel(icon)
-        ic.setFixedSize(22, 22)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet("""
-            font-size:15px;
-            background:transparent;
-            color:inherit;
-        """)
-        ic.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        h.addWidget(ic)
-
-        txt = QLabel(label)
-        txt.setStyleSheet(f"""
-            background:transparent;
-            color:#cbd5e1;
-            font-size:12.5px;
-            font-weight:700;
-            font-family:{FONT_FAMILY};
-        """)
-        txt.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        h.addWidget(txt, 1)
-
-        btn._icon_label = ic
-        btn._text_label = txt
 
         self.btn_group.addButton(btn)
         self._buttons[label] = btn
@@ -548,134 +549,92 @@ class Dashboard(QWidget):
         self._pages[label] = widget
 
         btn.clicked.connect(lambda _, l=label: self._switch_page(l))
-        btn.toggled.connect(lambda checked, b=btn: self._update_btn_style(b, checked))
+        btn.toggled.connect(
+            lambda checked, b=btn: self._update_btn_style(b, checked)
+        )
 
     def _sidebar_btn_style(self):
+        """نمط الأزرار العادية (غير محددة) — مع Hover واضح وتباعد جيد."""
         return f"""
             QPushButton {{
-                background:transparent;
-                border:none;
-                border-radius:11px;
-                margin:3px 14px;
-                text-align:right;
-                font-family:{FONT_FAMILY};
+                background: transparent;
+                border: none;
+                border-left: 3px solid transparent;
+                border-radius: {RADIUS};
+                margin: 3px 14px;
+                padding: 0 16px;
+                text-align: right;
+                font-family: {FONT_FAMILY};
+                font-size: 12.5px;
+                font-weight: 600;
+                color: rgba(255,255,255,0.85);
             }}
             QPushButton:hover {{
-                background: rgba(255,255,255,0.07);
-            }}
-            QPushButton:checked {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_HOV});
+                background: rgba(255,255,255,0.14);
+                color: white;
+                font-weight: 700;
             }}
         """
 
     def _update_btn_style(self, btn, checked):
-        if not hasattr(btn, "_icon_label"):
-            return
-
+        """تحديث لون الزر عند التحديد — مع شريط جانبي أبيض."""
         if checked:
-            btn._icon_label.setStyleSheet("""
-                font-size:15px;
-                background:transparent;
-                color:white;
-            """)
-            btn._text_label.setStyleSheet(f"""
-                background:transparent;
-                color:white;
-                font-size:12.5px;
-                font-weight:900;
-                font-family:{FONT_FAMILY};
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(255,255,255,0.18);
+                    border: none;
+                    border-left: 3px solid white;
+                    border-radius: {RADIUS};
+                    margin: 3px 14px;
+                    padding: 0 16px;
+                    text-align: right;
+                    font-family: {FONT_FAMILY};
+                    font-size: 12.5px;
+                    font-weight: 700;
+                    color: white;
+                }}
+                QPushButton:hover {{
+                    background: rgba(255,255,255,0.24);
+                }}
             """)
         else:
-            btn._icon_label.setStyleSheet("""
-                font-size:15px;
-                background:transparent;
-                color:inherit;
-            """)
-            btn._text_label.setStyleSheet(f"""
-                background:transparent;
-                color:#cbd5e1;
-                font-size:12.5px;
-                font-weight:700;
-                font-family:{FONT_FAMILY};
-            """)
+            btn.setStyleSheet(self._sidebar_btn_style())
 
-    def _make_action_btn(self, icon, label, danger=False):
-        btn = QPushButton()
-        btn.setMinimumHeight(44)
+    def _make_action_btn(self, label, danger=False):
+        """زر أسفل الـ sidebar (تغيير كلمة المرور / الخروج) — بنفس التباعد."""
+        btn = QPushButton(label)
+        btn.setMinimumHeight(38)
         btn.setCursor(Qt.PointingHandCursor)
 
         if danger:
-            color = "#f87171"
-            hover_bg = "rgba(239,68,68,0.12)"
-            hover_color = "#fca5a5"
+            color = "rgba(255,180,175,0.95)"
+            hover_bg = "rgba(255,255,255,0.14)"
+            hover_color = "white"
         else:
-            color = "#cbd5e1"
-            hover_bg = "rgba(255,255,255,0.07)"
+            color = "rgba(255,255,255,0.85)"
+            hover_bg = "rgba(255,255,255,0.14)"
             hover_color = "white"
 
         btn.setStyleSheet(f"""
             QPushButton {{
-                background:transparent;
-                border:none;
-                border-radius:10px;
-                margin:2px 14px;
-                text-align:right;
+                background: transparent;
+                border: none;
+                border-left: 3px solid transparent;
+                border-radius: {RADIUS};
+                margin: 3px 14px;
+                padding: 0 16px;
+                text-align: right;
+                font-family: {FONT_FAMILY};
+                font-size: 12.5px;
+                font-weight: 600;
+                color: {color};
             }}
             QPushButton:hover {{
-                background:{hover_bg};
+                background: {hover_bg};
+                color: {hover_color};
+                font-weight: 700;
             }}
         """)
-
-        h = QHBoxLayout(btn)
-        h.setContentsMargins(18, 0, 16, 0)
-        h.setSpacing(10)
-
-        ic = QLabel(icon)
-        ic.setFixedSize(22, 22)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            font-size:15px;
-            background:transparent;
-            color:{color};
-        """)
-        ic.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        h.addWidget(ic)
-
-        txt = QLabel(label)
-        txt.setStyleSheet(f"""
-            background:transparent;
-            color:{color};
-            font-size:12.5px;
-            font-weight:700;
-            font-family:{FONT_FAMILY};
-        """)
-        txt.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        h.addWidget(txt, 1)
-
-        def enter(e):
-            ic.setStyleSheet(f"font-size:15px; background:transparent; color:{hover_color};")
-            txt.setStyleSheet(f"""
-                background:transparent;
-                color:{hover_color};
-                font-size:12.5px;
-                font-weight:800;
-                font-family:{FONT_FAMILY};
-            """)
-
-        def leave(e):
-            ic.setStyleSheet(f"font-size:15px; background:transparent; color:{color};")
-            txt.setStyleSheet(f"""
-                background:transparent;
-                color:{color};
-                font-size:12.5px;
-                font-weight:700;
-                font-family:{FONT_FAMILY};
-            """)
-
-        btn.enterEvent = enter
-        btn.leaveEvent = leave
-
         return btn
 
     # ----------------------------------------------------------
@@ -701,30 +660,31 @@ class Dashboard(QWidget):
 
     def _build_topbar(self):
         bar = QFrame()
-        bar.setFixedHeight(72)
+        bar.setFixedHeight(58)
         bar.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
+                border:none;
                 border-bottom:1px solid {BORDER};
             }}
         """)
-        apply_shadow(bar, blur=14, y_offset=2, alpha=15)
 
         h = QHBoxLayout(bar)
-        h.setContentsMargins(32, 0, 32, 0)
-        h.setSpacing(16)
+        h.setContentsMargins(26, 0, 26, 0)
+        h.setSpacing(14)
 
         # breadcrumb
         crumb_box = QVBoxLayout()
-        crumb_box.setSpacing(2)
+        crumb_box.setSpacing(1)
 
-        crumb = QLabel("🏠  الرئيسية  ›  لوحة التحكم")
+        crumb = QLabel("الرئيسية  /  لوحة التحكم")
         crumb.setStyleSheet(f"""
             color:{TEXT_MUTED};
             font-size:10.5px;
-            font-weight:700;
+            font-weight:600;
             background:transparent;
-            letter-spacing:0.3px;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         crumb_box.addWidget(crumb)
         self._crumb_label = crumb
@@ -732,55 +692,57 @@ class Dashboard(QWidget):
         # Page title
         self.page_title = QLabel("لوحة التحكم")
         self.page_title.setStyleSheet(f"""
-            font-size:17px;
-            font-weight:900;
+            font-size:15px;
+            font-weight:700;
             color:{TEXT};
             background:transparent;
-            letter-spacing:0.2px;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         crumb_box.addWidget(self.page_title)
 
         h.addLayout(crumb_box)
-
         h.addStretch()
 
-        # Status indicator (متصل)
-        status_lbl = QLabel("●  متصل")
+        # Status indicator
+        status_lbl = QLabel("متصل")
         status_lbl.setAlignment(Qt.AlignCenter)
-        status_lbl.setFixedHeight(32)
-        status_lbl.setStyleSheet("""
-            QLabel {
-                background:#ecfdf5;
-                color:#059669;
-                border:1px solid #a7f3d0;
-                border-radius:16px;
-                padding:0 14px;
+        status_lbl.setFixedHeight(26)
+        status_lbl.setStyleSheet(f"""
+            QLabel {{
+                background:{SUCCESS_BG};
+                color:{SUCCESS};
+                border:1px solid {SUCCESS_BRD};
+                border-radius:{RADIUS};
+                padding:0 12px;
                 font-size:11px;
-                font-weight:800;
-            }
+                font-weight:600;
+                font-family:{FONT_FAMILY};
+            }}
         """)
         h.addWidget(status_lbl)
 
         # Divider
         dv = QFrame()
         dv.setFixedWidth(1)
-        dv.setFixedHeight(30)
+        dv.setFixedHeight(24)
         dv.setStyleSheet(f"background:{BORDER};")
         h.addWidget(dv)
 
         # User badge
-        user_badge = QLabel(f"👤   {self.username}")
+        user_badge = QLabel(self.username)
         user_badge.setAlignment(Qt.AlignCenter)
-        user_badge.setFixedHeight(38)
+        user_badge.setFixedHeight(30)
         user_badge.setStyleSheet(f"""
             QLabel {{
-                background:{PRIMARY_BG};
-                color:{PRIMARY_DK};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:19px;
-                padding:0 18px;
-                font-size:12px;
-                font-weight:800;
+                background:{SURFACE_3};
+                color:{TEXT};
+                border:1px solid {BORDER};
+                border-radius:{RADIUS};
+                padding:0 14px;
+                font-size:11.5px;
+                font-weight:600;
+                font-family:{FONT_FAMILY};
             }}
         """)
         h.addWidget(user_badge)
@@ -796,17 +758,8 @@ class Dashboard(QWidget):
     def _update_topbar_title(self, label):
         if hasattr(self, "page_title"):
             self.page_title.setText(label)
-            icons_map = {
-                "لوحة التحكم": "🏠",
-                "الشيفتات": "🕐",
-                "الموظفين": "👥",
-                "الحضور والانصراف": "✅",
-                "المرتبات": "💰",
-                "ربط البصمة": "🔌",
-            }
-            icon = icons_map.get(label, "🏠")
             if hasattr(self, "_crumb_label"):
-                self._crumb_label.setText(f"🏠  الرئيسية  ›  {icon} {label}")
+                self._crumb_label.setText(f"الرئيسية  /  {label}")
 
     # ========================================================
     #                لوحة التحكم (Home Page)
@@ -819,10 +772,11 @@ class Dashboard(QWidget):
         scroll.setStyleSheet(f"""
             QScrollArea {{ background:{BG}; border:none; }}
             QScrollBar:vertical {{
-                width:9px; background:transparent; margin:2px;
+                width:10px; background:{SURFACE_3}; margin:0;
             }}
             QScrollBar::handle:vertical {{
-                background:{BORDER_2}; border-radius:4px; min-height:40px;
+                background:{BORDER_2}; border-radius:2px;
+                min-height:40px; margin:2px;
             }}
             QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
             QScrollBar::add-line:vertical,
@@ -832,14 +786,14 @@ class Dashboard(QWidget):
         w = QWidget()
         w.setStyleSheet(f"background:{BG};")
         v = QVBoxLayout(w)
-        v.setContentsMargins(30, 26, 30, 30)
-        v.setSpacing(22)
+        v.setContentsMargins(26, 22, 26, 26)
+        v.setSpacing(18)
 
         # ====== إحصائيات ======
-        v.addWidget(self._section_header("📊", "نظرة عامة", "إحصائيات سريعة عن النظام"))
+        v.addWidget(self._section_header("نظرة عامة", "إحصائيات سريعة عن النظام"))
 
         stats_grid = QGridLayout()
-        stats_grid.setSpacing(16)
+        stats_grid.setSpacing(12)
 
         emp_count = self._safe_count(get_employees, [])
         shift_count = self._safe_count(get_shifts, [])
@@ -847,14 +801,14 @@ class Dashboard(QWidget):
         override_count = self._safe_count(count_all_overrides, 0)
 
         stats = [
-            ("👥", "الموظفين",         emp_count,      PRIMARY, PRIMARY_BG, PRIMARY_BRD, "موظف نشط"),
-            ("🕐", "الشيفتات",         shift_count,    SUCCESS, SUCCESS_BG, SUCCESS_BRD, "شيفت مسجّل"),
-            ("📌", "البصمات المسجلة",  punch_count,    WARNING, WARNING_BG, WARNING_BRD, "بصمة إجمالية"),
-            ("✎",  "تعديلات الحضور",   override_count, PURPLE,  PURPLE_BG,  PURPLE_BRD, "تعديل يدوي"),
+            ("الموظفين",         emp_count,      PRIMARY, PRIMARY_BG, PRIMARY_BRD, "موظف نشط"),
+            ("الشيفتات",         shift_count,    SUCCESS, SUCCESS_BG, SUCCESS_BRD, "شيفت مسجّل"),
+            ("البصمات المسجلة",  punch_count,    WARNING, WARNING_BG, WARNING_BRD, "بصمة إجمالية"),
+            ("تعديلات الحضور",   override_count, PURPLE,  PURPLE_BG,  PURPLE_BRD, "تعديل يدوي"),
         ]
 
-        for i, (icon, label, value, color, bg, brd, unit) in enumerate(stats):
-            card = self._make_stat_card(icon, label, value, color, bg, brd, unit)
+        for i, (label, value, color, bg, brd, unit) in enumerate(stats):
+            card = self._make_stat_card(label, value, color, bg, brd, unit)
             stats_grid.addWidget(card, 0, i)
 
         for c in range(4):
@@ -863,21 +817,21 @@ class Dashboard(QWidget):
         v.addLayout(stats_grid)
 
         # ====== إجراءات سريعة ======
-        v.addWidget(self._section_header("⚡", "إجراءات سريعة", "انتقل مباشرة إلى الصفحات الرئيسية"))
+        v.addWidget(self._section_header("إجراءات سريعة", "انتقل مباشرة إلى الصفحات الرئيسية"))
 
         actions_grid = QGridLayout()
-        actions_grid.setSpacing(16)
+        actions_grid.setSpacing(12)
 
         actions = [
-            ("🕐", "إنشاء شيفت جديد",   "أضف شيفتاً واربط الموظفين به",  PRIMARY, PRIMARY_BG, PRIMARY_BRD, "الشيفتات"),
-            ("👥", "إضافة موظف",       "سجّل موظفاً جديداً بالنظام",    SUCCESS, SUCCESS_BG, SUCCESS_BRD, "الموظفين"),
-            ("✅", "تسجيل حضور",       "سجّل بصمة حضور أو انصراف",     WARNING, WARNING_BG, WARNING_BRD, "الحضور والانصراف"),
-            ("🔌", "ربط جهاز البصمة",   "استمع للبصمات فور حدوثها",     INFO,    INFO_BG,    INFO_BRD,    "ربط البصمة"),
-            ("💰", "عرض المرتبات",     "احسب مرتبات الموظفين",          PURPLE,  PURPLE_BG,  PURPLE_BRD,  "المرتبات"),
+            ("إنشاء شيفت جديد",   "أضف شيفتاً واربط الموظفين به",  PRIMARY, PRIMARY_BG, PRIMARY_BRD, "الشيفتات"),
+            ("إضافة موظف",       "سجّل موظفاً جديداً بالنظام",    SUCCESS, SUCCESS_BG, SUCCESS_BRD, "الموظفين"),
+            ("تسجيل حضور",       "سجّل بصمة حضور أو انصراف",     WARNING, WARNING_BG, WARNING_BRD, "الحضور والانصراف"),
+            ("ربط جهاز البصمة",   "استمع للبصمات فور حدوثها",     INFO,    INFO_BG,    INFO_BRD,    "ربط البصمة"),
+            ("عرض المرتبات",     "احسب مرتبات الموظفين",          PURPLE,  PURPLE_BG,  PURPLE_BRD,  "المرتبات"),
         ]
 
-        for i, (icon, title, desc, color, bg, brd, target) in enumerate(actions):
-            card = self._make_action_card(icon, title, desc, color, bg, brd, target)
+        for i, (title, desc, color, bg, brd, target) in enumerate(actions):
+            card = self._make_action_card(title, desc, color, bg, brd, target)
             actions_grid.addWidget(card, i // 3, i % 3)
 
         for c in range(3):
@@ -886,7 +840,7 @@ class Dashboard(QWidget):
         v.addLayout(actions_grid)
 
         # ====== دليل البداية ======
-        v.addWidget(self._section_header("💡", "دليل البداية السريعة", "خطوات العمل بالترتيب"))
+        v.addWidget(self._section_header("دليل البداية السريعة", "خطوات العمل بالترتيب"))
 
         info_card = self._make_guide_card()
         v.addWidget(info_card)
@@ -905,35 +859,36 @@ class Dashboard(QWidget):
         except Exception:
             return default
 
-    def _section_header(self, icon, title, subtitle):
+    def _section_header(self, title, subtitle):
         w = QWidget()
         w.setStyleSheet("background:transparent;")
         h = QHBoxLayout(w)
-        h.setContentsMargins(2, 8, 2, 0)
-        h.setSpacing(11)
+        h.setContentsMargins(2, 6, 2, 0)
+        h.setSpacing(10)
 
-        ic = QLabel(icon)
-        ic.setFixedSize(36, 36)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:10px;
-                font-size:16px;
+        # شريط عمودي صغير على اليمين (RTL)
+        bar = QFrame()
+        bar.setFixedSize(3, 30)
+        bar.setStyleSheet(f"""
+            QFrame {{
+                background:{PRIMARY};
+                border:none;
+                border-radius:2px;
             }}
         """)
-        h.addWidget(ic)
+        h.addWidget(bar)
 
         v = QVBoxLayout()
         v.setSpacing(1)
 
         t = QLabel(title)
         t.setStyleSheet(f"""
-            font-size:15px;
-            font-weight:900;
+            font-size:14px;
+            font-weight:700;
             color:{TEXT};
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         v.addWidget(t)
 
@@ -942,6 +897,8 @@ class Dashboard(QWidget):
             font-size:11px;
             color:{TEXT_MUTED};
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         v.addWidget(s)
 
@@ -950,69 +907,39 @@ class Dashboard(QWidget):
 
         return w
 
-    def _make_stat_card(self, icon, label, value, color, bg, brd, unit):
+    def _make_stat_card(self, label, value, color, bg, brd, unit):
         card = QFrame()
-        card.setMinimumHeight(140)
+        card.setMinimumHeight(112)
         card.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:{RADIUS};
             }}
             QFrame:hover {{
-                border:1.5px solid {brd};
+                border:1px solid {brd};
             }}
         """)
-        apply_shadow(card, blur=14, y_offset=3, alpha=22)
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(22, 20, 22, 20)
-        v.setSpacing(12)
+        v.setContentsMargins(18, 16, 18, 16)
+        v.setSpacing(10)
 
+        # Top row: label + unit
         top = QHBoxLayout()
-        top.setSpacing(12)
-
-        ic = QLabel(icon)
-        ic.setFixedSize(48, 48)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{bg};
-                color:{color};
-                border:1px solid {brd};
-                border-radius:13px;
-                font-size:21px;
-                font-weight:900;
-            }}
-        """)
-        top.addWidget(ic)
-        top.addStretch()
-
-        v.addLayout(top)
-
-        val = QLabel(str(value))
-        val.setStyleSheet(f"""
-            font-size:32px;
-            font-weight:900;
-            color:{TEXT};
-            background:transparent;
-            letter-spacing:-0.5px;
-        """)
-        v.addWidget(val)
-
-        bottom = QHBoxLayout()
-        bottom.setSpacing(6)
+        top.setSpacing(8)
 
         lbl = QLabel(label)
         lbl.setStyleSheet(f"""
-            font-size:12px;
-            color:{TEXT_SEC};
+            font-size:11.5px;
+            color:{TEXT_MUTED};
             background:transparent;
-            font-weight:800;
+            font-weight:600;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
-        bottom.addWidget(lbl)
-
-        bottom.addStretch()
+        top.addWidget(lbl)
+        top.addStretch()
 
         un = QLabel(unit)
         un.setStyleSheet(f"""
@@ -1020,56 +947,59 @@ class Dashboard(QWidget):
             color:{color};
             background:{bg};
             border:1px solid {brd};
-            border-radius:9px;
-            padding:3px 9px;
-            font-weight:800;
+            border-radius:{RADIUS};
+            padding:2px 8px;
+            font-weight:600;
+            font-family:{FONT_FAMILY};
         """)
-        bottom.addWidget(un)
+        top.addWidget(un)
 
-        v.addLayout(bottom)
+        v.addLayout(top)
+
+        # Value
+        val = QLabel(str(value))
+        val.setStyleSheet(f"""
+            font-size:28px;
+            font-weight:700;
+            color:{TEXT};
+            background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
+        """)
+        v.addWidget(val)
+
+        v.addStretch()
 
         return card
 
-    def _make_action_card(self, icon, title, desc, color, bg, brd, target_page):
+    def _make_action_card(self, title, desc, color, bg, brd, target_page):
         card = QFrame()
-        card.setMinimumHeight(140)
+        card.setMinimumHeight(112)
         card.setCursor(Qt.PointingHandCursor)
         card.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:{RADIUS};
             }}
             QFrame:hover {{
                 background:{bg};
-                border:1.5px solid {brd};
+                border:1px solid {brd};
             }}
         """)
-        apply_shadow(card, blur=12, y_offset=3, alpha=20)
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(22, 20, 22, 20)
-        v.setSpacing(10)
-
-        ic = QLabel(icon)
-        ic.setFixedSize(46, 46)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{bg};
-                border:1px solid {brd};
-                border-radius:13px;
-                font-size:19px;
-            }}
-        """)
-        v.addWidget(ic)
+        v.setContentsMargins(18, 14, 18, 14)
+        v.setSpacing(6)
 
         t = QLabel(title)
         t.setStyleSheet(f"""
-            font-size:14.5px;
-            font-weight:900;
+            font-size:13.5px;
+            font-weight:700;
             color:{TEXT};
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         v.addWidget(t)
 
@@ -1078,18 +1008,29 @@ class Dashboard(QWidget):
             font-size:11px;
             color:{TEXT_MUTED};
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
         """)
         d.setWordWrap(True)
         v.addWidget(d)
 
         v.addStretch()
 
-        arrow = QLabel("فتح الصفحة   ←")
+        # Footer مع خط فاصل وسهم نصي
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        v.addWidget(sep)
+
+        arrow = QLabel("فتح الصفحة  ←")
         arrow.setStyleSheet(f"""
             color:{color};
             font-size:11px;
-            font-weight:900;
+            font-weight:700;
             background:transparent;
+            font-family:{FONT_FAMILY};
+            border:none;
+            padding-top:4px;
         """)
         v.addWidget(arrow)
 
@@ -1107,29 +1048,28 @@ class Dashboard(QWidget):
             QFrame {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:{RADIUS};
             }}
         """)
-        apply_shadow(card, blur=14, y_offset=3, alpha=20)
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(26, 22, 26, 22)
-        v.setSpacing(14)
+        v.setContentsMargins(22, 18, 22, 18)
+        v.setSpacing(10)
 
         steps = [
-            ("1", "أنشئ شيفت جديد",
+            ("01", "أنشئ شيفت جديد",
              "اذهب إلى صفحة الشيفتات وحدّد أوقات العمل، أيام العمل، سياسة المرضية، والساعات الإضافية.",
              PRIMARY),
-            ("2", "أضف الموظفين",
+            ("02", "أضف الموظفين",
              "من صفحة الموظفين، سجّل بيانات كل موظف (كود، اسم، راتب، بدلات، تأمينات) واربطه بالشيفت.",
              SUCCESS),
-            ("3", "اربط جهاز البصمة",
+            ("03", "اربط جهاز البصمة",
              "من صفحة «ربط البصمة»، أدخل IP الجهاز وفعّل «الاستماع التلقائي» لاستقبال البصمات فوراً.",
              INFO),
-            ("4", "تابع الحضور والانصراف",
+            ("04", "تابع الحضور والانصراف",
              "استعرض البصمات، عدّل الأيام، أضف إجازات، وتحقق من التأخير والإضافي والخصومات.",
              WARNING),
-            ("5", "اعرض المرتبات",
+            ("05", "اعرض المرتبات",
              "احسب مرتبات الموظفين لكل فترة، اعرض التفاصيل، وصدّر الكشف كـ CSV.",
              PURPLE),
         ]
@@ -1140,23 +1080,25 @@ class Dashboard(QWidget):
                 QFrame {{
                     background:{SURFACE_2};
                     border:1px solid {DIVIDER};
-                    border-radius:12px;
+                    border-radius:{RADIUS};
                 }}
             """)
             rl = QHBoxLayout(row)
-            rl.setContentsMargins(16, 14, 16, 14)
-            rl.setSpacing(16)
+            rl.setContentsMargins(14, 12, 14, 12)
+            rl.setSpacing(14)
 
             badge = QLabel(num)
-            badge.setFixedSize(38, 38)
+            badge.setFixedSize(34, 34)
             badge.setAlignment(Qt.AlignCenter)
             badge.setStyleSheet(f"""
                 QLabel {{
                     background:{color};
                     color:white;
-                    border-radius:19px;
-                    font-size:15px;
-                    font-weight:900;
+                    border:1px solid {color};
+                    border-radius:{RADIUS};
+                    font-size:12px;
+                    font-weight:700;
+                    font-family:{FONT_FAMILY};
                 }}
             """)
             rl.addWidget(badge)
@@ -1165,17 +1107,21 @@ class Dashboard(QWidget):
             txt.setSpacing(3)
             tt = QLabel(title)
             tt.setStyleSheet(f"""
-                font-size:13px;
-                font-weight:900;
+                font-size:12.5px;
+                font-weight:700;
                 color:{TEXT};
                 background:transparent;
+                font-family:{FONT_FAMILY};
+                border:none;
             """)
             txt.addWidget(tt)
             dd = QLabel(desc)
             dd.setStyleSheet(f"""
-                font-size:11.5px;
+                font-size:11px;
                 color:{TEXT_SEC};
                 background:transparent;
+                font-family:{FONT_FAMILY};
+                border:none;
             """)
             dd.setWordWrap(True)
             txt.addWidget(dd)

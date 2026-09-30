@@ -1,9 +1,9 @@
 """
 صفحة ربط البصمة والاستماع التلقائي
 - تتصل بجهاز ZKTeco عبر الشبكة
+- تسحب قائمة الموظفين من الجهاز (بأسمائهم)
 - تستمع للبصمات في الوقت الفعلي
-- تسحب البصمات المُخزّنة في ذاكرة الجهاز خلال فترة محددة
-- تضيفها مباشرة لجدول raw_punches (فقط للموظفين المسجّلين في النظام)
+- تسحب جميع البصمات المخزّنة (حتى لو الكود مش مسجل في النظام)
 """
 
 import threading
@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QFrame, QGridLayout, QSpinBox, QCheckBox,
     QAbstractItemView, QGraphicsDropShadowEffect, QTextEdit,
     QDialog, QComboBox, QScrollArea, QDialogButtonBox, QDateEdit,
-    QSizePolicy
+    QSizePolicy, QTabWidget
 )
 from PySide6.QtCore import Qt, QDate, QTime, Signal, QObject, QTimer
 from PySide6.QtGui import QColor, QFont, QIcon
@@ -25,11 +25,16 @@ from database import (
     get_device_settings, save_device_settings,
     update_device_last_connected, add_live_punch,
     get_recent_live_punches, get_connection,
+    # ✅ جديد — قائمة موظفي الجهاز
+    save_pulled_device_users, get_device_users,
+    get_unregistered_device_users, get_registered_device_users,
+    count_device_users, count_unregistered_device_users,
+    get_last_device_sync_time, delete_all_device_users,
 )
 
 
 # ============================================================
-#                نظام الألوان (Modern Pro)
+#                نظام الألوان
 # ============================================================
 BG          = "#f1f5f9"
 BG_2        = "#eef2f7"
@@ -95,15 +100,16 @@ def apply_shadow(widget, blur=20, y_offset=4, alpha=25):
 
 
 # ============================================================
-#        إضافة بصمات آمنة (مع فلترة وتجاهل التكرار)
+#    ✅ حفظ جميع البصمات (بدون فلترة الأكواد غير المسجلة)
 # ============================================================
-def add_device_punches_safe(records, source="device_pull"):
+def add_device_punches_all(records, source="device_pull"):
     """
-    إضافة بصمات من الجهاز بأمان:
-    - تتجاهل الأكواد غير المسجّلة في النظام
-    - تتجاهل التكرار (نفس الكود + نفس الوقت)
+    إضافة جميع البصمات — لا نتجاهل أي كود:
+    - الأكواد المسجّلة في النظام → employee_id = id الموظف
+    - الأكواد غير المسجّلة → employee_id = NULL (محفوظة للمراجعة لاحقاً)
+    - التكرار (نفس الكود + نفس الوقت) → يُتجاهل فقط لمنع التكرار
 
-    Returns: (inserted, duplicates, unknown, total)
+    Returns: (inserted, duplicates, unknown_codes, total)
     """
     if not records:
         return 0, 0, 0, 0
@@ -124,13 +130,11 @@ def add_device_punches_safe(records, source="device_pull"):
             punch_time = rec.get("punch_time")
 
             if not code or not punch_time:
-                unknown += 1
                 continue
 
             emp_id = code_to_id.get(code)
             if emp_id is None:
-                unknown += 1
-                continue
+                unknown += 1  # نعدّها لكن لا نتجاهلها
 
             dup = cur.execute(
                 "SELECT id FROM raw_punches WHERE employee_code=? AND punch_time=?",
@@ -159,6 +163,11 @@ def add_device_punches_safe(records, source="device_pull"):
     return inserted, duplicates, unknown, len(records)
 
 
+# للتوافق مع الكود القديم إن استُخدم
+def add_device_punches_safe(records, source="device_pull"):
+    return add_device_punches_all(records, source=source)
+
+
 # ============================================================
 #        Signals
 # ============================================================
@@ -170,6 +179,14 @@ class DeviceSignals(QObject):
 
 
 class PunchesPullSignals(QObject):
+    result_ready = Signal(dict)
+    status_changed = Signal(str, str)
+    log_message = Signal(str)
+    finished = Signal()
+
+
+# ✅ جديد — Signals لسحب قائمة الموظفين
+class UsersPullSignals(QObject):
     result_ready = Signal(dict)
     status_changed = Signal(str, str)
     log_message = Signal(str)
@@ -222,10 +239,10 @@ class LiveListenerThread(threading.Thread):
                 dev_name = self._conn.get_device_name()
                 serial = self._conn.get_serialnumber()
                 self.signals.log_message.emit(
-                    f"✅ متصل بـ: {dev_name}  ·  S/N: {serial}"
+                    f"متصل بـ: {dev_name}  ·  S/N: {serial}"
                 )
             except Exception:
-                self.signals.log_message.emit("✅ متصل بالجهاز بنجاح")
+                self.signals.log_message.emit("متصل بالجهاز بنجاح")
 
             self.signals.status_changed.emit(
                 "connected", f"متصل بـ {self.ip}:{self.port}"
@@ -238,7 +255,7 @@ class LiveListenerThread(threading.Thread):
             except Exception:
                 pass
 
-            self.signals.log_message.emit("🎧 بدء الاستماع للبصمات...")
+            self.signals.log_message.emit("بدء الاستماع للبصمات...")
 
             while not self._stop_event.is_set():
                 try:
@@ -269,23 +286,33 @@ class LiveListenerThread(threading.Thread):
                             except Exception:
                                 pass
 
+                        # لو الكود مش مسجل — نجيب الاسم من device_users
+                        if not emp_name:
+                            try:
+                                from database import get_device_user
+                                du = get_device_user(emp_code)
+                                if du and du["name"]:
+                                    emp_name = f"{du['name']} (غير مسجل)"
+                            except Exception:
+                                pass
+
                         if ok:
                             self.signals.punch_received.emit(
                                 emp_code, punch_str, emp_name, "live"
                             )
                             self.signals.log_message.emit(
-                                f"🔔 بصمة: {emp_code} ({emp_name}) @ {punch_str}"
+                                f"بصمة: {emp_code} ({emp_name or 'غير معروف'}) @ {punch_str}"
                             )
                         else:
                             self.signals.log_message.emit(
-                                f"⏭ تجاهل: {emp_code} — {msg}"
+                                f"تجاهل: {emp_code} — {msg}"
                             )
 
                 except Exception as inner_e:
                     if self._stop_event.is_set():
                         break
                     self.signals.log_message.emit(
-                        f"⚠️ خطأ مؤقت: {inner_e} — إعادة المحاولة..."
+                        f"خطأ مؤقت: {inner_e} — إعادة المحاولة..."
                     )
                     time.sleep(3)
                     try:
@@ -316,7 +343,7 @@ class LiveListenerThread(threading.Thread):
 
 
 # ============================================================
-#       Thread سحب البصمات المخزّنة على الجهاز
+#       Thread سحب البصمات (جميع البصمات بدون فلترة)
 # ============================================================
 class PunchesPullThread(threading.Thread):
     def __init__(self, ip, port, password, from_date, to_date, signals):
@@ -352,19 +379,19 @@ class PunchesPullThread(threading.Thread):
 
             try:
                 dev_name = conn.get_device_name()
-                self.signals.log_message.emit(f"📡 الجهاز: {dev_name}")
+                self.signals.log_message.emit(f"الجهاز: {dev_name}")
             except Exception:
                 pass
 
             self.signals.status_changed.emit("connected", "متصل — جاري سحب البصمات...")
             self.signals.log_message.emit(
-                f"📥 جاري سحب البصمات من {self.from_date} إلى {self.to_date} ..."
+                f"جاري سحب البصمات من {self.from_date} إلى {self.to_date} ..."
             )
 
             all_atts = conn.get_attendance()
             total_from_device = len(all_atts) if all_atts else 0
             self.signals.log_message.emit(
-                f"📊 إجمالي البصمات على الجهاز: {total_from_device}"
+                f"إجمالي البصمات على الجهاز: {total_from_device}"
             )
 
             from_dt = datetime.strptime(self.from_date, "%Y-%m-%d")
@@ -391,21 +418,22 @@ class PunchesPullThread(threading.Thread):
 
             in_range = len(filtered)
             self.signals.log_message.emit(
-                f"⏱️  بصمات في الفترة المحددة: {in_range}"
+                f"بصمات في الفترة المحددة: {in_range}"
             )
 
-            inserted, duplicates, unknown, total = add_device_punches_safe(
+            # ✅ الحفظ الآن يشمل كل الأكواد (المسجّلة وغير المسجّلة)
+            inserted, duplicates, unknown, total = add_device_punches_all(
                 filtered, source="device_pull"
             )
 
-            self.signals.log_message.emit(f"✅ تم إضافة {inserted} بصمة جديدة")
+            self.signals.log_message.emit(f"تم إضافة {inserted} بصمة جديدة")
             if duplicates:
                 self.signals.log_message.emit(
-                    f"⏭️  مكررة (موجودة مسبقاً): {duplicates}"
+                    f"مكررة (موجودة مسبقاً): {duplicates}"
                 )
             if unknown:
                 self.signals.log_message.emit(
-                    f"⚠️  كود غير مسجّل في النظام: {unknown}"
+                    f"أكواد غير مسجّلة في النظام: {unknown} (تم حفظ بصماتها)"
                 )
 
             result = {
@@ -423,7 +451,7 @@ class PunchesPullThread(threading.Thread):
 
         except Exception as e:
             self.signals.status_changed.emit("error", f"فشل السحب: {e}")
-            self.signals.log_message.emit(f"❌ خطأ في السحب: {e}")
+            self.signals.log_message.emit(f"خطأ في السحب: {e}")
         finally:
             try:
                 if conn:
@@ -434,7 +462,110 @@ class PunchesPullThread(threading.Thread):
 
 
 # ============================================================
-#              Dialog: ملخص نتائج السحب
+#       ✅ Thread جديد: سحب قائمة الموظفين من الجهاز
+# ============================================================
+class UsersPullThread(threading.Thread):
+    """يسحب قائمة الموظفين (users) من ذاكرة الجهاز بأسمائهم وأكوادهم."""
+
+    def __init__(self, ip, port, password, signals):
+        super().__init__(daemon=True)
+        self.ip = ip
+        self.port = int(port)
+        self.password = int(password)
+        self.signals = signals
+
+    def run(self):
+        conn = None
+        try:
+            from zk import ZK
+        except ImportError:
+            self.signals.status_changed.emit(
+                "error",
+                "مكتبة pyzk غير مثبتة.\nشغّل: python -m pip install pyzk"
+            )
+            self.signals.finished.emit()
+            return
+
+        try:
+            self.signals.status_changed.emit(
+                "connecting", f"جاري الاتصال بـ {self.ip}:{self.port} ..."
+            )
+            zk = ZK(
+                self.ip, port=self.port, timeout=60,
+                password=self.password, force_udp=False, ommit_ping=True,
+            )
+            conn = zk.connect()
+
+            try:
+                dev_name = conn.get_device_name()
+                self.signals.log_message.emit(f"الجهاز: {dev_name}")
+            except Exception:
+                pass
+
+            self.signals.status_changed.emit(
+                "connected", "متصل — جاري سحب قائمة الموظفين..."
+            )
+
+            users = conn.get_users()
+            self.signals.log_message.emit(
+                f"عدد الموظفين على الجهاز: {len(users) if users else 0}"
+            )
+
+            device_users = []
+            for u in (users or []):
+                try:
+                    device_users.append({
+                        "uid": getattr(u, "uid", None),
+                        "user_id": str(getattr(u, "user_id", "")).strip(),
+                        "name": str(getattr(u, "name", "") or "").strip(),
+                        "privilege": int(getattr(u, "privilege", 0) or 0),
+                        "password": str(getattr(u, "password", "") or ""),
+                        "group_id": str(getattr(u, "group_id", "") or ""),
+                        "card": int(getattr(u, "card", 0) or 0),
+                    })
+                except Exception:
+                    continue
+
+            inserted, updated, failed = save_pulled_device_users(
+                device_users, device_ip=self.ip
+            )
+
+            self.signals.log_message.emit(
+                f"تم حفظ {inserted} موظف جديد + تحديث {updated} موظف"
+            )
+
+            # نحسب عدد غير المسجلين في النظام
+            try:
+                from database import count_unregistered_device_users
+                unregistered = count_unregistered_device_users()
+            except Exception:
+                unregistered = 0
+
+            result = {
+                "total_from_device": len(device_users),
+                "inserted": inserted,
+                "updated": updated,
+                "failed": failed,
+                "unregistered": unregistered,
+            }
+
+            self.signals.result_ready.emit(result)
+            self.signals.status_changed.emit("done", "تم سحب قائمة الموظفين بنجاح")
+
+        except Exception as e:
+            self.signals.status_changed.emit("error", f"فشل السحب: {e}")
+            self.signals.log_message.emit(f"خطأ في سحب الموظفين: {e}")
+        finally:
+            try:
+                if conn:
+                    conn.disconnect()
+            except Exception:
+                pass
+            self.signals.finished.emit()
+
+
+# ============================================================
+#              Dialog: ملخص نتائج سحب البصمات
 # ============================================================
 class PullResultDialog(QDialog):
     def __init__(self, result, parent=None):
@@ -452,13 +583,12 @@ class PullResultDialog(QDialog):
         v.setContentsMargins(24, 24, 24, 24)
         v.setSpacing(18)
 
-        # Header
         head = QFrame()
         head.setStyleSheet(f"""
             QFrame {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
         apply_shadow(head, blur=20, y_offset=4, alpha=60)
@@ -466,19 +596,6 @@ class PullResultDialog(QDialog):
         hl = QHBoxLayout(head)
         hl.setContentsMargins(22, 18, 22, 18)
         hl.setSpacing(16)
-
-        ic = QLabel("📊")
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(54, 54)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:15px; font-size:25px;
-            }}
-        """)
-        hl.addWidget(ic)
 
         tbox = QVBoxLayout()
         tbox.setSpacing(4)
@@ -488,7 +605,7 @@ class PullResultDialog(QDialog):
         )
         tbox.addWidget(title)
         sub = QLabel(
-            f"📅  الفترة: {self.result.get('from_date','')}  →  {self.result.get('to_date','')}"
+            f"الفترة: {self.result.get('from_date','')}  →  {self.result.get('to_date','')}"
         )
         sub.setStyleSheet("font-size:11px; color:#9db3cf; background:transparent;")
         tbox.addWidget(sub)
@@ -497,25 +614,24 @@ class PullResultDialog(QDialog):
 
         v.addWidget(head)
 
-        # بطاقات النتائج - 3×2
         cards_grid = QGridLayout()
         cards_grid.setSpacing(14)
 
         c1 = self._mini_card("إجمالي على الجهاز",
                              str(self.result.get("total_from_device", 0)),
-                             "💾", PRIMARY, PRIMARY_BG, PRIMARY_BRD)
+                             PRIMARY, PRIMARY_BG, PRIMARY_BRD)
         c2 = self._mini_card("في الفترة المحددة",
                              str(self.result.get("in_range", 0)),
-                             "⏱", INFO, INFO_BG, INFO_BRD)
+                             INFO, INFO_BG, INFO_BRD)
         c3 = self._mini_card("تم إضافتها للنظام",
                              str(self.result.get("inserted", 0)),
-                             "✅", SUCCESS, SUCCESS_BG, SUCCESS_BRD)
+                             SUCCESS, SUCCESS_BG, SUCCESS_BRD)
         c4 = self._mini_card("مكررة (موجودة)",
                              str(self.result.get("duplicates", 0)),
-                             "⏭", WARNING, WARNING_BG, WARNING_BRD)
-        c5 = self._mini_card("كود غير مسجّل",
+                             WARNING, WARNING_BG, WARNING_BRD)
+        c5 = self._mini_card("أكواد غير مسجّلة",
                              str(self.result.get("unknown", 0)),
-                             "⚠️", DANGER, DANGER_BG, DANGER_BRD)
+                             DANGER, DANGER_BG, DANGER_BRD)
 
         cards_grid.addWidget(c1, 0, 0)
         cards_grid.addWidget(c2, 0, 1)
@@ -528,27 +644,22 @@ class PullResultDialog(QDialog):
 
         v.addLayout(cards_grid)
 
-        # ملاحظة
         note = QFrame()
         note.setStyleSheet(f"""
             QFrame {{
                 background:{INFO_BG};
                 border:1px solid {INFO_BRD};
-                border-radius:11px;
+                border-radius:10px;
             }}
         """)
         nl = QHBoxLayout(note)
         nl.setContentsMargins(16, 14, 16, 14)
         nl.setSpacing(10)
 
-        note_ic = QLabel("💡")
-        note_ic.setStyleSheet("font-size:16px; background:transparent;")
-        nl.addWidget(note_ic)
-
         note_lbl = QLabel(
-            "«كود غير مسجّل» يعني أن البصمة على الجهاز بكود غير موجود في النظام، "
-            "فتم تجاهلها. البصمات المضافة الآن ظاهرة في صفحة «الحضور والانصراف» "
-            "وفي القائمة أعلاه."
+            "تم حفظ جميع البصمات في النظام — حتى بصمات الأكواد غير المسجّلة. "
+            "بصمات الأكواد غير المسجّلة تُخزَّن بـ employee_id فارغ، ويمكنك "
+            "رؤيتها في جدول البصمات الأخيرة لاحقاً."
         )
         note_lbl.setStyleSheet(
             f"font-size:11.5px; color:{INFO}; background:transparent; font-weight:600;"
@@ -557,7 +668,6 @@ class PullResultDialog(QDialog):
         nl.addWidget(note_lbl, 1)
         v.addWidget(note)
 
-        # زر الإغلاق
         btns = QHBoxLayout()
         btns.addStretch()
         btn_close = QPushButton("حسناً")
@@ -569,7 +679,7 @@ class PullResultDialog(QDialog):
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
                 color:white; border:none;
-                border-radius:11px; padding:0 28px;
+                border-radius:10px; padding:0 28px;
                 font-weight:900; font-size:13px;
             }}
             QPushButton:hover {{ background:{SUCCESS_HOV}; }}
@@ -578,49 +688,172 @@ class PullResultDialog(QDialog):
         btns.addWidget(btn_close)
         v.addLayout(btns)
 
-    def _mini_card(self, title, value, icon_text, color, bg, brd):
+    def _mini_card(self, title, value, color, bg, brd):
         card = QFrame()
-        card.setMinimumHeight(84)
+        card.setMinimumHeight(80)
         card.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:13px;
+                border-radius:12px;
             }}
             QFrame:hover {{ border:1.5px solid {brd}; }}
         """)
         apply_shadow(card, blur=10, y_offset=2, alpha=18)
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(14, 12, 14, 12)
-        h.setSpacing(11)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(4)
 
-        ic = QLabel(icon_text)
-        ic.setFixedSize(44, 44)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{bg}; color:{color};
-                border:1.5px solid {brd}; border-radius:12px;
-                font-size:19px;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
-        v.setSpacing(2)
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10px; color:{TEXT_MUTED}; font-weight:800;"
+            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:800;"
         )
         v.addWidget(lbl)
+
         val = QLabel(value)
         val.setStyleSheet(
-            f"font-size:20px; color:{TEXT}; font-weight:900;"
+            f"font-size:22px; color:{color}; font-weight:900;"
         )
         v.addWidget(val)
-        h.addLayout(v)
-        h.addStretch()
+
+        return card
+
+
+# ============================================================
+#   ✅ Dialog: ملخص سحب قائمة الموظفين من الجهاز
+# ============================================================
+class UsersPullResultDialog(QDialog):
+    def __init__(self, result, parent=None):
+        super().__init__(parent)
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setWindowTitle("نتيجة سحب قائمة الموظفين")
+        self.setMinimumWidth(600)
+        self.setStyleSheet(f"QDialog {{ background:{BG}; }}")
+        self.result = result or {}
+        self._build_ui()
+
+    def _build_ui(self):
+        v = QVBoxLayout(self)
+        v.setContentsMargins(24, 24, 24, 24)
+        v.setSpacing(18)
+
+        head = QFrame()
+        head.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
+                border-radius:14px;
+            }}
+        """)
+        apply_shadow(head, blur=20, y_offset=4, alpha=60)
+
+        hl = QHBoxLayout(head)
+        hl.setContentsMargins(22, 18, 22, 18)
+
+        title = QLabel("اكتمل سحب قائمة الموظفين من الجهاز")
+        title.setStyleSheet(
+            "font-size:16px; font-weight:900; color:white; background:transparent;"
+        )
+        hl.addWidget(title)
+        hl.addStretch()
+        v.addWidget(head)
+
+        cards_grid = QGridLayout()
+        cards_grid.setSpacing(14)
+
+        c1 = self._mini_card("على الجهاز",
+                             str(self.result.get("total_from_device", 0)),
+                             PRIMARY, PRIMARY_BG, PRIMARY_BRD)
+        c2 = self._mini_card("جديد",
+                             str(self.result.get("inserted", 0)),
+                             SUCCESS, SUCCESS_BG, SUCCESS_BRD)
+        c3 = self._mini_card("محدَّث",
+                             str(self.result.get("updated", 0)),
+                             INFO, INFO_BG, INFO_BRD)
+        c4 = self._mini_card("غير مسجّل في النظام",
+                             str(self.result.get("unregistered", 0)),
+                             WARNING, WARNING_BG, WARNING_BRD)
+
+        cards_grid.addWidget(c1, 0, 0)
+        cards_grid.addWidget(c2, 0, 1)
+        cards_grid.addWidget(c3, 1, 0)
+        cards_grid.addWidget(c4, 1, 1)
+
+        for c in range(2):
+            cards_grid.setColumnStretch(c, 1)
+
+        v.addLayout(cards_grid)
+
+        note = QFrame()
+        note.setStyleSheet(f"""
+            QFrame {{
+                background:{INFO_BG};
+                border:1px solid {INFO_BRD};
+                border-radius:10px;
+            }}
+        """)
+        nl = QHBoxLayout(note)
+        nl.setContentsMargins(16, 14, 16, 14)
+        note_lbl = QLabel(
+            "تم سحب أسماء الموظفين من الجهاز. افتح قسم «الموظفون على الجهاز» "
+            "لمعرفة الأكواد غير المسجّلة في النظام وتسجيلها إن أردت."
+        )
+        note_lbl.setStyleSheet(
+            f"font-size:11.5px; color:{INFO}; background:transparent; font-weight:600;"
+        )
+        note_lbl.setWordWrap(True)
+        nl.addWidget(note_lbl, 1)
+        v.addWidget(note)
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        btn = QPushButton("حسناً")
+        btn.setFixedHeight(42)
+        btn.setMinimumWidth(140)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
+                color:white; border:none;
+                border-radius:10px; padding:0 26px;
+                font-weight:900; font-size:13px;
+            }}
+            QPushButton:hover {{ background:{SUCCESS_HOV}; }}
+        """)
+        btn.clicked.connect(self.accept)
+        btns.addWidget(btn)
+        v.addLayout(btns)
+
+    def _mini_card(self, title, value, color, bg, brd):
+        card = QFrame()
+        card.setMinimumHeight(80)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:12px;
+            }}
+            QFrame:hover {{ border:1.5px solid {brd}; }}
+        """)
+        apply_shadow(card, blur=10, y_offset=2, alpha=18)
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(4)
+
+        lbl = QLabel(title)
+        lbl.setStyleSheet(
+            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:800;"
+        )
+        v.addWidget(lbl)
+
+        val = QLabel(value)
+        val.setStyleSheet(
+            f"font-size:22px; color:{color}; font-weight:900;"
+        )
+        v.addWidget(val)
 
         return card
 
@@ -634,13 +867,17 @@ class DeviceConnectionPage(QWidget):
         self.setLayoutDirection(Qt.RightToLeft)
         self._thread = None
         self._pull_thread = None
+        self._users_thread = None
         self._signals = DeviceSignals()
         self._pull_signals = PunchesPullSignals()
+        self._users_signals = UsersPullSignals()
         self._connect_signals()
         self._connect_pull_signals()
+        self._connect_users_signals()
         self._build_ui()
         self._load_settings()
         self._refresh_recent_punches()
+        self._refresh_device_users()
 
     def _connect_signals(self):
         self._signals.punch_received.connect(self._on_punch_received)
@@ -653,6 +890,12 @@ class DeviceConnectionPage(QWidget):
         self._pull_signals.log_message.connect(self._append_log)
         self._pull_signals.finished.connect(self._on_pull_finished)
 
+    def _connect_users_signals(self):
+        self._users_signals.result_ready.connect(self._on_users_result)
+        self._users_signals.status_changed.connect(self._on_users_status)
+        self._users_signals.log_message.connect(self._append_log)
+        self._users_signals.finished.connect(self._on_users_finished)
+
     # ========================================================
     #                    بناء الواجهة
     # ========================================================
@@ -663,7 +906,6 @@ class DeviceConnectionPage(QWidget):
 
         root.addWidget(self._build_topbar())
 
-        # Scroll للمحتوى
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -688,23 +930,21 @@ class DeviceConnectionPage(QWidget):
         body_layout.setContentsMargins(26, 22, 26, 26)
         body_layout.setSpacing(18)
 
-        top_row = QHBoxLayout()
-        top_row.setSpacing(18)
-        top_row.addWidget(self._build_settings_card(), 5)
-        top_row.addWidget(self._build_status_card(), 4)
-        body_layout.addLayout(top_row)
-
+        body_layout.addWidget(self._build_settings_card())
+        body_layout.addWidget(self._build_status_card())
+        # ✅ قسم جديد: قائمة الموظفين على الجهاز
+        body_layout.addWidget(self._build_device_users_card())
+        body_layout.addWidget(self._build_pull_card())
         body_layout.addWidget(self._build_live_table_card())
         body_layout.addWidget(self._build_log_card())
 
         scroll.setWidget(body)
         root.addWidget(scroll, 1)
 
-    # ----------------------------------------------------------
     def _build_topbar(self):
         bar = QFrame()
         bar.setObjectName("deviceTopbar")
-        bar.setFixedHeight(96)
+        bar.setFixedHeight(76)
         bar.setStyleSheet(f"""
             QFrame#deviceTopbar {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -716,55 +956,28 @@ class DeviceConnectionPage(QWidget):
 
         h = QHBoxLayout(bar)
         h.setContentsMargins(30, 0, 30, 0)
-        h.setSpacing(18)
+        h.setSpacing(16)
 
-        # Icon container
-        icon = QLabel("🔌")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(54, 54)
-        icon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                border:1px solid {NAVY_ACCENT};
-                border-radius:15px;
-                font-size:24px;
-            }}
-        """)
-        apply_shadow(icon, blur=14, y_offset=2, alpha=60)
-        h.addWidget(icon)
-
-        tbox = QVBoxLayout()
-        tbox.setSpacing(4)
         title = QLabel("ربط جهاز البصمة")
         title.setStyleSheet(f"""
             QLabel {{
-                color:white; font-size:22px; font-weight:900;
+                color:white; font-size:20px; font-weight:900;
                 background:transparent; font-family:{FONT_FAMILY};
-                letter-spacing:0.3px;
             }}
         """)
-        tbox.addWidget(title)
-
-        sub = QLabel("ربط الجهاز • استماع مباشر • سحب البصمات المخزّنة خلال فترة")
-        sub.setStyleSheet(
-            "QLabel { color:#94a8c4; font-size:11px; background:transparent; }"
-        )
-        tbox.addWidget(sub)
-        h.addLayout(tbox)
+        h.addWidget(title)
         h.addStretch()
 
-        # Status pill
-        self.topbar_status = QLabel("●  غير متصل")
+        self.topbar_status = QLabel("غير متصل")
         self.topbar_status.setAlignment(Qt.AlignCenter)
-        self.topbar_status.setFixedHeight(38)
-        self.topbar_status.setMinimumWidth(130)
+        self.topbar_status.setFixedHeight(34)
+        self.topbar_status.setMinimumWidth(120)
         self.topbar_status.setStyleSheet(f"""
             QLabel {{
                 background: rgba(148, 163, 184, 0.15);
                 color:#cbd5e1;
                 border:1px solid rgba(148, 163, 184, 0.35);
-                border-radius:19px;
+                border-radius:17px;
                 padding:0 16px;
                 font-size:11.5px;
                 font-weight:800;
@@ -782,51 +995,33 @@ class DeviceConnectionPage(QWidget):
             QFrame#settingsCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(22, 20, 22, 20)
+        v.setContentsMargins(24, 22, 24, 22)
         v.setSpacing(16)
 
-        # العنوان
-        head = QHBoxLayout()
-        head.setSpacing(12)
-
-        hicon = QLabel("⚙️")
-        hicon.setFixedSize(44, 44)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG}; color:{PRIMARY};
-                border:1px solid {PRIMARY_BRD}; border-radius:12px;
-                font-size:19px;
-            }}
-        """)
-        head.addWidget(hicon)
-
-        hbox = QVBoxLayout()
-        hbox.setSpacing(2)
         ht = QLabel("إعدادات الجهاز")
         ht.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
-        hbox.addWidget(ht)
-        hs = QLabel("أدخل IP ثم اربط — الاستماع المباشر يبدأ فوراً")
-        hs.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
-        hbox.addWidget(hs)
-        head.addLayout(hbox)
-        head.addStretch()
-        v.addLayout(head)
+        v.addWidget(ht)
 
-        # الحقول
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        v.addWidget(line)
+
         g = QGridLayout()
-        g.setHorizontalSpacing(12)
-        g.setVerticalSpacing(12)
+        g.setHorizontalSpacing(14)
+        g.setVerticalSpacing(14)
+        for c in range(4):
+            g.setColumnStretch(c, 1)
 
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.201")
-        self.ip_input.setFixedHeight(44)
+        self.ip_input.setFixedHeight(46)
         self.ip_input.setLayoutDirection(Qt.LeftToRight)
         self.ip_input.setAlignment(Qt.AlignLeft)
         self._style_input(self.ip_input)
@@ -834,7 +1029,7 @@ class DeviceConnectionPage(QWidget):
         self.port_input = QSpinBox()
         self.port_input.setRange(1, 65535)
         self.port_input.setValue(4370)
-        self.port_input.setFixedHeight(44)
+        self.port_input.setFixedHeight(46)
         self.port_input.setLayoutDirection(Qt.LeftToRight)
         self.port_input.setAlignment(Qt.AlignLeft)
         self._style_spinbox(self.port_input)
@@ -842,31 +1037,30 @@ class DeviceConnectionPage(QWidget):
         self.password_input = QSpinBox()
         self.password_input.setRange(0, 99999999)
         self.password_input.setValue(0)
-        self.password_input.setFixedHeight(44)
+        self.password_input.setFixedHeight(46)
         self.password_input.setLayoutDirection(Qt.LeftToRight)
         self.password_input.setAlignment(Qt.AlignLeft)
         self._style_spinbox(self.password_input)
 
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("جهاز البصمة الرئيسي")
-        self.name_input.setFixedHeight(44)
+        self.name_input.setFixedHeight(46)
         self.name_input.setText("جهاز البصمة الرئيسي")
         self._style_input(self.name_input)
 
         g.addWidget(self._field("عنوان IP", self.ip_input), 0, 0)
         g.addWidget(self._field("المنفذ (Port)", self.port_input), 0, 1)
-        g.addWidget(self._field("كلمة المرور (Password)", self.password_input), 1, 0)
-        g.addWidget(self._field("اسم الجهاز", self.name_input), 1, 1)
+        g.addWidget(self._field("كلمة المرور (Password)", self.password_input), 0, 2)
+        g.addWidget(self._field("اسم الجهاز", self.name_input), 0, 3)
 
         v.addLayout(g)
 
-        # خيار الاستماع التلقائي
         self.auto_listen_cb = QCheckBox("الاستماع تلقائياً عند فتح التطبيق")
         self.auto_listen_cb.setCursor(Qt.PointingHandCursor)
         self.auto_listen_cb.setStyleSheet(f"""
             QCheckBox {{
-                font-size:11.5px; font-weight:800; color:{TEXT_SEC};
-                background:transparent; spacing:9px; padding:8px 0;
+                font-size:12px; font-weight:800; color:{TEXT_SEC};
+                background:transparent; spacing:9px; padding:6px 0;
             }}
             QCheckBox::indicator {{
                 width:18px; height:18px;
@@ -880,35 +1074,40 @@ class DeviceConnectionPage(QWidget):
         """)
         v.addWidget(self.auto_listen_cb)
 
-        # الأزرار
         btns = QHBoxLayout()
-        btns.setSpacing(9)
+        btns.setSpacing(10)
 
-        self.btn_connect = QPushButton("🔗  ربط الجهاز")
+        self.btn_connect = QPushButton("ربط الجهاز")
         self.btn_connect.setFixedHeight(46)
+        self.btn_connect.setMinimumWidth(170)
         self.btn_connect.setCursor(Qt.PointingHandCursor)
         self.btn_connect.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {SUCCESS}, stop:1 {SUCCESS_HOV});
                 color:white; border:none;
-                border-radius:11px; padding:0 24px;
-                font-weight:900; font-size:12.5px;
+                border-radius:10px; padding:0 26px;
+                font-weight:900; font-size:13px;
             }}
             QPushButton:hover {{ background:{SUCCESS_HOV}; }}
+            QPushButton:disabled {{
+                background:{SURFACE_2}; color:{TEXT_MUTED};
+                border:1px solid {BORDER};
+            }}
         """)
         self.btn_connect.clicked.connect(self._on_connect)
         btns.addWidget(self.btn_connect)
 
-        self.btn_disconnect = QPushButton("⏹  إيقاف الاستماع")
+        self.btn_disconnect = QPushButton("إيقاف الاستماع")
         self.btn_disconnect.setFixedHeight(46)
+        self.btn_disconnect.setMinimumWidth(170)
         self.btn_disconnect.setCursor(Qt.PointingHandCursor)
         self.btn_disconnect.setEnabled(False)
         self.btn_disconnect.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{DANGER};
-                border:1px solid {DANGER_BRD}; border-radius:11px;
-                padding:0 24px; font-weight:800; font-size:12.5px;
+                border:1.5px solid {DANGER_BRD}; border-radius:10px;
+                padding:0 26px; font-weight:800; font-size:13px;
             }}
             QPushButton:hover:enabled {{ background:{DANGER_BG}; }}
             QPushButton:disabled {{
@@ -921,14 +1120,15 @@ class DeviceConnectionPage(QWidget):
 
         btns.addStretch()
 
-        btn_save = QPushButton("💾  حفظ")
+        btn_save = QPushButton("حفظ الإعدادات")
         btn_save.setFixedHeight(46)
+        btn_save.setMinimumWidth(170)
         btn_save.setCursor(Qt.PointingHandCursor)
         btn_save.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{PRIMARY_DK};
-                border:1px solid {PRIMARY_BRD}; border-radius:11px;
-                padding:0 24px; font-weight:800; font-size:12.5px;
+                border:1.5px solid {PRIMARY_BRD}; border-radius:10px;
+                padding:0 26px; font-weight:800; font-size:13px;
             }}
             QPushButton:hover {{ background:{PRIMARY_BG}; }}
         """)
@@ -937,62 +1137,341 @@ class DeviceConnectionPage(QWidget):
 
         v.addLayout(btns)
 
-        # ==================================================
-        #  قسم سحب البصمات - بتصميم مميز
-        # ==================================================
-        pull_box = QFrame()
-        pull_box.setObjectName("pullBox")
-        pull_box.setStyleSheet(f"""
-            QFrame#pullBox {{
+        return card
+
+    # ----------------------------------------------------------
+    def _build_status_card(self):
+        card = QFrame()
+        card.setObjectName("statusCard")
+        card.setStyleSheet(f"""
+            QFrame#statusCard {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:14px;
+            }}
+        """)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(24, 22, 24, 22)
+        v.setSpacing(16)
+
+        ht = QLabel("حالة الاتصال")
+        ht.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        v.addWidget(ht)
+
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        v.addWidget(line)
+
+        self.status_box = QFrame()
+        self.status_box.setMinimumHeight(110)
+        self.status_box.setStyleSheet(f"""
+            QFrame {{
+                background:{SURFACE_2};
+                border:1px solid {BORDER};
+                border-radius:12px;
+            }}
+        """)
+        sb = QHBoxLayout(self.status_box)
+        sb.setContentsMargins(24, 18, 24, 18)
+        sb.setSpacing(20)
+
+        self.status_dot = QFrame()
+        self.status_dot.setFixedSize(14, 14)
+        self.status_dot.setStyleSheet(
+            f"background:{TEXT_MUTED}; border-radius:7px; border:none;"
+        )
+
+        dot_wrap = QVBoxLayout()
+        dot_wrap.addStretch()
+        dot_wrap.addWidget(self.status_dot, 0, Qt.AlignCenter)
+        dot_wrap.addStretch()
+
+        dot_container = QWidget()
+        dot_container.setStyleSheet("background:transparent;")
+        dot_container.setLayout(dot_wrap)
+        dot_container.setFixedWidth(60)
+        sb.addWidget(dot_container)
+
+        status_text = QVBoxLayout()
+        status_text.setSpacing(6)
+
+        self.status_label = QLabel("غير متصل")
+        self.status_label.setStyleSheet(
+            f"font-size:18px; font-weight:900; color:{TEXT_MUTED}; "
+            f"background:transparent; border:none;"
+        )
+        status_text.addWidget(self.status_label)
+
+        self.status_detail = QLabel("أدخل IP واضغط «ربط الجهاز» لبدء الاستماع")
+        self.status_detail.setWordWrap(True)
+        self.status_detail.setStyleSheet(
+            f"font-size:12px; color:{TEXT_MUTED}; background:transparent; border:none;"
+        )
+        status_text.addWidget(self.status_detail)
+
+        sb.addLayout(status_text, 1)
+
+        v.addWidget(self.status_box)
+
+        stats = QHBoxLayout()
+        stats.setSpacing(12)
+
+        self.cnt_today = self._mini_counter("بصمات اليوم", "0",
+                                            PRIMARY, PRIMARY_BG, PRIMARY_BRD)
+        self.cnt_total = self._mini_counter("إجمالي البصمات", "0",
+                                            SUCCESS, SUCCESS_BG, SUCCESS_BRD)
+        self.cnt_live = self._mini_counter("بصمات حية (هذه الجلسة)", "0",
+                                           DANGER, DANGER_BG, DANGER_BRD)
+
+        stats.addWidget(self.cnt_today)
+        stats.addWidget(self.cnt_total)
+        stats.addWidget(self.cnt_live)
+        v.addLayout(stats)
+
+        return card
+
+    # ----------------------------------------------------------
+    #   ✅ قسم جديد: الموظفون على الجهاز
+    # ----------------------------------------------------------
+    def _build_device_users_card(self):
+        card = QFrame()
+        card.setObjectName("deviceUsersCard")
+        card.setStyleSheet(f"""
+            QFrame#deviceUsersCard {{
+                background:{SURFACE};
+                border:1px solid {BORDER};
+                border-radius:14px;
+            }}
+        """)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(24, 22, 24, 22)
+        v.setSpacing(16)
+
+        # العنوان + الأزرار
+        head = QHBoxLayout()
+        head.setSpacing(12)
+
+        ht = QLabel("الموظفون على الجهاز")
+        ht.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        head.addWidget(ht)
+        head.addStretch()
+
+        # سطر معلومات آخر مزامنة
+        self.users_sync_label = QLabel("لم تتم المزامنة بعد")
+        self.users_sync_label.setStyleSheet(
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent; "
+            f"font-weight:700; padding-right:6px;"
+        )
+        head.addWidget(self.users_sync_label)
+
+        v.addLayout(head)
+
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        v.addWidget(line)
+
+        # بطاقات إحصائية صغيرة
+        stats_row = QHBoxLayout()
+        stats_row.setSpacing(12)
+
+        self.du_total = self._mini_counter("إجمالي على الجهاز", "0",
+                                           PRIMARY, PRIMARY_BG, PRIMARY_BRD)
+        self.du_registered = self._mini_counter("مسجّل في النظام", "0",
+                                                SUCCESS, SUCCESS_BG, SUCCESS_BRD)
+        self.du_unregistered = self._mini_counter("غير مسجّل", "0",
+                                                  WARNING, WARNING_BG, WARNING_BRD)
+        stats_row.addWidget(self.du_total)
+        stats_row.addWidget(self.du_registered)
+        stats_row.addWidget(self.du_unregistered)
+        v.addLayout(stats_row)
+
+        # أزرار التحكم
+        btns_row = QHBoxLayout()
+        btns_row.setSpacing(10)
+
+        self.btn_pull_users = QPushButton("سحب قائمة الموظفين من الجهاز")
+        self.btn_pull_users.setFixedHeight(46)
+        self.btn_pull_users.setMinimumWidth(240)
+        self.btn_pull_users.setCursor(Qt.PointingHandCursor)
+        self.btn_pull_users.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
+                color:white; border:none;
+                border-radius:10px; padding:0 26px;
+                font-weight:900; font-size:13px;
+            }}
+            QPushButton:hover {{ background:{PRIMARY_HOV}; }}
+            QPushButton:disabled {{
+                background:{SURFACE_2}; color:{TEXT_MUTED};
+                border:1px solid {BORDER};
+            }}
+        """)
+        self.btn_pull_users.clicked.connect(self._on_pull_users)
+        btns_row.addWidget(self.btn_pull_users)
+
+        # فلتر
+        self.users_filter = QComboBox()
+        self.users_filter.setFixedHeight(46)
+        self.users_filter.setMinimumWidth(200)
+        self.users_filter.addItem("الكل", "all")
+        self.users_filter.addItem("غير مسجّل في النظام فقط", "unregistered")
+        self.users_filter.addItem("مسجّل في النظام فقط", "registered")
+        self.users_filter.setStyleSheet(f"""
+            QComboBox {{
+                background:{SURFACE_2}; border:1.5px solid {BORDER};
+                border-radius:10px; padding:0 14px;
+                font-size:12.5px; color:{TEXT};
+                font-family:{FONT_FAMILY};
+            }}
+            QComboBox:hover {{ background:white; border-color:{BORDER_2}; }}
+            QComboBox:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
+            QComboBox::drop-down {{ border:none; width:26px; }}
+            QComboBox::down-arrow {{
+                image:none; width:0; height:0;
+                border-left:4px solid transparent;
+                border-right:4px solid transparent;
+                border-top:5px solid {TEXT_MUTED};
+                margin-right:8px;
+            }}
+            QComboBox QAbstractItemView {{
+                background:white;
+                border:1px solid {BORDER};
+                padding:4px;
+                selection-background-color:{PRIMARY_BG};
+                selection-color:{PRIMARY};
+                outline:none;
+            }}
+            QComboBox QAbstractItemView::item {{
+                padding:7px 10px; min-height:22px;
+            }}
+        """)
+        self.users_filter.currentIndexChanged.connect(
+            lambda _: self._refresh_device_users()
+        )
+        btns_row.addWidget(self.users_filter)
+
+        btns_row.addStretch()
+
+        btn_clear_users = QPushButton("حذف القائمة المحفوظة")
+        btn_clear_users.setFixedHeight(46)
+        btn_clear_users.setMinimumWidth(170)
+        btn_clear_users.setCursor(Qt.PointingHandCursor)
+        btn_clear_users.setStyleSheet(f"""
+            QPushButton {{
+                background:{SURFACE}; color:{DANGER};
+                border:1.5px solid {DANGER_BRD}; border-radius:10px;
+                padding:0 26px; font-weight:800; font-size:13px;
+            }}
+            QPushButton:hover {{ background:{DANGER_BG}; }}
+        """)
+        btn_clear_users.clicked.connect(self._clear_device_users)
+        btns_row.addWidget(btn_clear_users)
+
+        v.addLayout(btns_row)
+
+        # الجدول
+        self.users_table = QTableWidget(0, 4)
+        self.users_table.setHorizontalHeaderLabels([
+            "كود الموظف على الجهاز", "الاسم على الجهاز",
+            "الحالة في النظام", "البصمات المسجّلة"
+        ])
+        self.users_table.verticalHeader().setVisible(False)
+        self.users_table.setShowGrid(False)
+        self.users_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.users_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.users_table.setFocusPolicy(Qt.NoFocus)
+        self.users_table.setAlternatingRowColors(True)
+        self.users_table.setMinimumHeight(260)
+        self.users_table.setStyleSheet(f"""
+            QTableWidget {{
+                background:{SURFACE}; border:none; color:{TEXT};
+                font-size:11.5px; outline:none;
+                selection-background-color:{PRIMARY_BG};
+                selection-color:{TEXT}; gridline-color:transparent;
+                font-family:{FONT_FAMILY};
+            }}
+            QTableWidget::item {{
+                padding:10px 8px; border-bottom:1px solid {DIVIDER};
+            }}
+            QTableWidget::item:selected {{
+                background:{PRIMARY_BG}; color:{TEXT};
+            }}
+            QTableWidget::item:alternate {{ background:{ROW_ALT}; }}
+            QHeaderView::section {{
+                background:{HEADER_BG}; color:{TEXT_MUTED};
+                padding:12px 8px; border:none;
+                border-bottom:1px solid {BORDER};
+                font-weight:900; font-size:10.5px;
+            }}
+            QScrollBar:vertical {{
+                width:9px; background:transparent; margin:2px;
+            }}
+            QScrollBar::handle:vertical {{
+                background:{BORDER_2}; border-radius:4px; min-height:40px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{ height:0; }}
+        """)
+        hh = self.users_table.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        self.users_table.verticalHeader().setDefaultSectionSize(46)
+        v.addWidget(self.users_table)
+
+        return card
+
+    # ----------------------------------------------------------
+    def _build_pull_card(self):
+        card = QFrame()
+        card.setObjectName("pullCard")
+        card.setStyleSheet(f"""
+            QFrame#pullCard {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 #f8fafc, stop:1 #eef2ff);
                 border:1.5px solid {PRIMARY_BRD};
                 border-radius:14px;
             }}
         """)
-        pb = QVBoxLayout(pull_box)
-        pb.setContentsMargins(18, 16, 18, 16)
-        pb.setSpacing(14)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
 
-        # عنوان القسم
-        ptitle_box = QHBoxLayout()
-        ptitle_box.setSpacing(11)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(24, 22, 24, 22)
+        v.setSpacing(16)
 
-        picon = QLabel("📥")
-        picon.setFixedSize(38, 38)
-        picon.setAlignment(Qt.AlignCenter)
-        picon.setStyleSheet(f"""
-            QLabel {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {PRIMARY}, stop:1 {PRIMARY_DK});
-                color:white;
-                border-radius:11px;
-                font-size:17px;
-            }}
-        """)
-        ptitle_box.addWidget(picon)
+        ht = QLabel("سحب البصمات المخزّنة على الجهاز")
+        ht.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        v.addWidget(ht)
 
-        ptbox = QVBoxLayout()
-        ptbox.setSpacing(2)
-        pt = QLabel("سحب البصمات المخزّنة على الجهاز")
-        pt.setStyleSheet(f"font-size:13px; font-weight:900; color:{TEXT};")
-        ptbox.addWidget(pt)
-        ps = QLabel("حدّد الفترة الزمنية — يُسحب فقط بصمات الموظفين المسجّلين في النظام")
-        ps.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
-        ptbox.addWidget(ps)
-        ptitle_box.addLayout(ptbox)
-        ptitle_box.addStretch()
-        pb.addLayout(ptitle_box)
+        sub = QLabel(
+            "يتم سحب جميع البصمات (بما فيها أكواد غير مسجّلة في النظام) وحفظها كاملة"
+        )
+        sub.setStyleSheet(
+            f"font-size:11px; color:{TEXT_MUTED}; background:transparent;"
+        )
+        sub.setWordWrap(True)
+        v.addWidget(sub)
 
-        # فلاتر التاريخ
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{PRIMARY_BRD}; border:none;")
+        v.addWidget(line)
+
         dates_row = QHBoxLayout()
-        dates_row.setSpacing(12)
+        dates_row.setSpacing(14)
 
         self.pull_from_date = QDateEdit()
         self.pull_from_date.setCalendarPopup(True)
         self.pull_from_date.setDisplayFormat("yyyy-MM-dd")
         self.pull_from_date.setDate(QDate.currentDate().addDays(-30))
-        self.pull_from_date.setFixedHeight(44)
+        self.pull_from_date.setFixedHeight(46)
         self.pull_from_date.setLayoutDirection(Qt.LeftToRight)
         self._style_date(self.pull_from_date)
         dates_row.addWidget(self._field("من تاريخ", self.pull_from_date), 1)
@@ -1001,51 +1480,42 @@ class DeviceConnectionPage(QWidget):
         self.pull_to_date.setCalendarPopup(True)
         self.pull_to_date.setDisplayFormat("yyyy-MM-dd")
         self.pull_to_date.setDate(QDate.currentDate())
-        self.pull_to_date.setFixedHeight(44)
+        self.pull_to_date.setFixedHeight(46)
         self.pull_to_date.setLayoutDirection(Qt.LeftToRight)
         self._style_date(self.pull_to_date)
         dates_row.addWidget(self._field("إلى تاريخ", self.pull_to_date), 1)
 
-        pb.addLayout(dates_row)
+        v.addLayout(dates_row)
 
-        # أزرار سريعة
         quick_row = QHBoxLayout()
-        quick_row.setSpacing(7)
+        quick_row.setSpacing(8)
 
-        quick_lbl = QLabel("⚡ فترة سريعة:")
+        quick_lbl = QLabel("فترة سريعة:")
         quick_lbl.setStyleSheet(
-            f"font-size:11px; color:{TEXT_SEC}; font-weight:800; background:transparent;"
+            f"font-size:11.5px; color:{TEXT_SEC}; font-weight:800; background:transparent;"
         )
         quick_row.addWidget(quick_lbl)
 
-        btn_7d = self._quick_btn("آخر 7 أيام", 7)
-        btn_30d = self._quick_btn("آخر 30 يوم", 30)
-        btn_90d = self._quick_btn("آخر 90 يوم", 90)
-        btn_this_month = self._quick_btn("هذا الشهر", None, "month")
-        btn_all = self._quick_btn("كل البصمات", None, "all")
-
-        quick_row.addWidget(btn_7d)
-        quick_row.addWidget(btn_30d)
-        quick_row.addWidget(btn_90d)
-        quick_row.addWidget(btn_this_month)
-        quick_row.addWidget(btn_all)
+        quick_row.addWidget(self._quick_btn("آخر 7 أيام", 7))
+        quick_row.addWidget(self._quick_btn("آخر 30 يوم", 30))
+        quick_row.addWidget(self._quick_btn("آخر 90 يوم", 90))
+        quick_row.addWidget(self._quick_btn("هذا الشهر", None, "month"))
+        quick_row.addWidget(self._quick_btn("كل البصمات", None, "all"))
         quick_row.addStretch()
 
-        pb.addLayout(quick_row)
+        v.addLayout(quick_row)
 
-        # زر السحب
-        self.btn_pull_punches = QPushButton("📥  ابدأ سحب البصمات")
-        self.btn_pull_punches.setFixedHeight(50)
+        self.btn_pull_punches = QPushButton("ابدأ سحب البصمات")
+        self.btn_pull_punches.setFixedHeight(52)
         self.btn_pull_punches.setCursor(Qt.PointingHandCursor)
         self.btn_pull_punches.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 {PRIMARY}, stop:0.5 #4d6bff, stop:1 {PRIMARY_DK});
                 color:white; border:none;
-                border-radius:12px; padding:0 28px;
-                font-weight:900; font-size:13.5px;
+                border-radius:11px; padding:0 28px;
+                font-weight:900; font-size:14px;
                 font-family:{FONT_FAMILY};
-                letter-spacing:0.3px;
             }}
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -1058,23 +1528,21 @@ class DeviceConnectionPage(QWidget):
             }}
         """)
         self.btn_pull_punches.clicked.connect(self._on_pull_punches)
-        pb.addWidget(self.btn_pull_punches)
-
-        v.addWidget(pull_box)
+        v.addWidget(self.btn_pull_punches)
 
         return card
 
     def _quick_btn(self, text, days=None, mode=None):
         btn = QPushButton(text)
-        btn.setFixedHeight(32)
+        btn.setFixedHeight(34)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE};
                 color:{TEXT_SEC};
                 border:1px solid {BORDER};
-                border-radius:16px;
-                padding:0 14px;
+                border-radius:17px;
+                padding:0 16px;
                 font-size:11px;
                 font-weight:800;
             }}
@@ -1106,7 +1574,7 @@ class DeviceConnectionPage(QWidget):
             QDateEdit {{
                 background:white;
                 border:1.5px solid {BORDER};
-                border-radius:11px;
+                border-radius:10px;
                 padding:0 14px;
                 font-size:12.5px;
                 color:{TEXT};
@@ -1125,107 +1593,6 @@ class DeviceConnectionPage(QWidget):
         """)
 
     # ----------------------------------------------------------
-    def _build_status_card(self):
-        card = QFrame()
-        card.setObjectName("statusCard")
-        card.setStyleSheet(f"""
-            QFrame#statusCard {{
-                background:{SURFACE};
-                border:1px solid {BORDER};
-                border-radius:16px;
-            }}
-        """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
-
-        v = QVBoxLayout(card)
-        v.setContentsMargins(22, 20, 22, 20)
-        v.setSpacing(16)
-
-        head = QHBoxLayout()
-        head.setSpacing(12)
-
-        hicon = QLabel("📡")
-        hicon.setFixedSize(44, 44)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{INFO_BG}; color:{INFO};
-                border:1px solid {INFO_BRD}; border-radius:12px;
-                font-size:19px;
-            }}
-        """)
-        head.addWidget(hicon)
-
-        hbox = QVBoxLayout()
-        hbox.setSpacing(2)
-        ht = QLabel("حالة الاتصال")
-        ht.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
-        hbox.addWidget(ht)
-        hs = QLabel("معلومات الجهاز والاستماع المباشر")
-        hs.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
-        hbox.addWidget(hs)
-        head.addLayout(hbox)
-        head.addStretch()
-        v.addLayout(head)
-
-        # Status box
-        self.status_box = QFrame()
-        self.status_box.setStyleSheet(f"""
-            QFrame {{
-                background:{SURFACE_2};
-                border:1px solid {BORDER};
-                border-radius:14px;
-            }}
-        """)
-        sb = QVBoxLayout(self.status_box)
-        sb.setContentsMargins(20, 20, 20, 20)
-        sb.setSpacing(10)
-
-        self.status_icon = QLabel("⚪")
-        self.status_icon.setAlignment(Qt.AlignCenter)
-        self.status_icon.setStyleSheet("font-size:48px; background:transparent;")
-        sb.addWidget(self.status_icon)
-
-        self.status_label = QLabel("غير متصل")
-        self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet(
-            f"font-size:16px; font-weight:900; color:{TEXT_MUTED}; background:transparent;"
-        )
-        sb.addWidget(self.status_label)
-
-        self.status_detail = QLabel("أدخل IP واضغط «ربط الجهاز»")
-        self.status_detail.setAlignment(Qt.AlignCenter)
-        self.status_detail.setWordWrap(True)
-        self.status_detail.setStyleSheet(
-            f"font-size:11.5px; color:{TEXT_MUTED}; background:transparent;"
-        )
-        sb.addWidget(self.status_detail)
-
-        v.addWidget(self.status_box)
-
-        # العدادات
-        stats = QGridLayout()
-        stats.setHorizontalSpacing(10)
-        stats.setVerticalSpacing(10)
-
-        self.cnt_today = self._mini_counter("بصمات اليوم", "0", "📅",
-                                            PRIMARY, PRIMARY_BG, PRIMARY_BRD)
-        self.cnt_total = self._mini_counter("إجمالي البصمات", "0", "📊",
-                                            SUCCESS, SUCCESS_BG, SUCCESS_BRD)
-        self.cnt_live = self._mini_counter("بصمات حية", "0", "🔴",
-                                           DANGER, DANGER_BG, DANGER_BRD)
-
-        stats.addWidget(self.cnt_today, 0, 0)
-        stats.addWidget(self.cnt_total, 0, 1)
-        stats.addWidget(self.cnt_live, 0, 2)
-        for c in range(3):
-            stats.setColumnStretch(c, 1)
-        v.addLayout(stats)
-
-        v.addStretch()
-        return card
-
-    # ----------------------------------------------------------
     def _build_live_table_card(self):
         card = QFrame()
         card.setObjectName("liveTableCard")
@@ -1233,61 +1600,42 @@ class DeviceConnectionPage(QWidget):
             QFrame#liveTableCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
 
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
         head = QFrame()
-        head.setFixedHeight(72)
+        head.setFixedHeight(60)
         head.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border-bottom:1px solid {DIVIDER};
-                border-top-left-radius:16px;
-                border-top-right-radius:16px;
+                border-top-left-radius:14px;
+                border-top-right-radius:14px;
             }}
         """)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setContentsMargins(22, 0, 22, 0)
         hl.setSpacing(12)
 
-        hicon = QLabel("🔔")
-        hicon.setFixedSize(40, 40)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{WARNING_BG};
-                border:1px solid {WARNING_BRD};
-                border-radius:11px;
-                font-size:18px;
-            }}
-        """)
-        hl.addWidget(hicon)
-
-        hbox = QVBoxLayout()
-        hbox.setSpacing(2)
         title = QLabel("آخر البصمات المسجّلة في النظام")
-        title.setStyleSheet(f"font-size:15px; font-weight:900; color:{TEXT};")
-        hbox.addWidget(title)
-        hint = QLabel("تُحدَّث تلقائياً عند وصول بصمة جديدة")
-        hint.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
-        hbox.addWidget(hint)
-        hl.addLayout(hbox)
+        title.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        hl.addWidget(title)
         hl.addStretch()
 
-        btn_refresh = QPushButton("🔄  تحديث")
-        btn_refresh.setFixedHeight(36)
+        btn_refresh = QPushButton("تحديث")
+        btn_refresh.setFixedHeight(34)
         btn_refresh.setCursor(Qt.PointingHandCursor)
         btn_refresh.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:10px;
-                padding:0 16px; font-weight:800; font-size:11.5px;
+                border:1px solid {BORDER_2}; border-radius:9px;
+                padding:0 18px; font-weight:800; font-size:11.5px;
             }}
             QPushButton:hover {{ background:{SURFACE_2}; border-color:{TEXT_MUTED}; }}
         """)
@@ -1306,7 +1654,7 @@ class DeviceConnectionPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setAlternatingRowColors(True)
-        self.table.setMinimumHeight(260)
+        self.table.setMinimumHeight(280)
         self.table.setStyleSheet(f"""
             QTableWidget {{
                 background:{SURFACE}; border:none; color:{TEXT};
@@ -1327,7 +1675,6 @@ class DeviceConnectionPage(QWidget):
                 padding:12px 8px; border:none;
                 border-bottom:1px solid {BORDER};
                 font-weight:900; font-size:10.5px;
-                letter-spacing:0.2px;
             }}
             QScrollBar:vertical {{
                 width:9px; background:transparent; margin:2px;
@@ -1353,55 +1700,42 @@ class DeviceConnectionPage(QWidget):
             QFrame#logCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
 
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
         head = QFrame()
-        head.setFixedHeight(60)
+        head.setFixedHeight(56)
         head.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border-bottom:1px solid {DIVIDER};
-                border-top-left-radius:16px;
-                border-top-right-radius:16px;
+                border-top-left-radius:14px;
+                border-top-right-radius:14px;
             }}
         """)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setContentsMargins(22, 0, 22, 0)
         hl.setSpacing(12)
 
-        hicon = QLabel("📝")
-        hicon.setFixedSize(36, 36)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{TEXT_SEC}15;
-                border:1px solid {BORDER};
-                border-radius:10px;
-                font-size:16px;
-            }}
-        """)
-        hl.addWidget(hicon)
-
         title = QLabel("سجل الأحداث")
-        title.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        title.setStyleSheet(f"font-size:13.5px; font-weight:900; color:{TEXT};")
         hl.addWidget(title)
         hl.addStretch()
 
-        btn_clear = QPushButton("🗑  مسح السجل")
+        btn_clear = QPushButton("مسح السجل")
         btn_clear.setFixedHeight(32)
         btn_clear.setCursor(Qt.PointingHandCursor)
         btn_clear.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{TEXT_SEC};
                 border:1px solid {BORDER}; border-radius:9px;
-                padding:0 14px; font-weight:800; font-size:11px;
+                padding:0 16px; font-weight:800; font-size:11px;
             }}
             QPushButton:hover {{ background:{SURFACE_2}; border-color:{BORDER_2}; }}
         """)
@@ -1412,13 +1746,13 @@ class DeviceConnectionPage(QWidget):
 
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setMinimumHeight(160)
+        self.log_view.setMinimumHeight(180)
         self.log_view.setStyleSheet(f"""
             QTextEdit {{
                 background:{SURFACE_2};
                 border:none;
-                border-bottom-left-radius:16px;
-                border-bottom-right-radius:16px;
+                border-bottom-left-radius:14px;
+                border-bottom-right-radius:14px;
                 padding:12px 16px;
                 font-family: Consolas, monospace;
                 font-size:11.5px;
@@ -1442,7 +1776,7 @@ class DeviceConnectionPage(QWidget):
         lbl = QLabel(label)
         lbl.setStyleSheet(
             f"font-size:10.5px; font-weight:800; color:{TEXT_SEC}; "
-            f"background:transparent; letter-spacing:0.2px;"
+            f"background:transparent;"
         )
         v.addWidget(lbl)
         v.addWidget(widget)
@@ -1452,7 +1786,7 @@ class DeviceConnectionPage(QWidget):
         inp.setStyleSheet(f"""
             QLineEdit {{
                 background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
+                border-radius:10px; padding:0 14px;
                 font-size:12.5px; color:{TEXT};
             }}
             QLineEdit:hover {{ background:white; border-color:{BORDER_2}; }}
@@ -1463,53 +1797,41 @@ class DeviceConnectionPage(QWidget):
         sp.setStyleSheet(f"""
             QSpinBox {{
                 background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
+                border-radius:10px; padding:0 14px;
                 font-size:12.5px; color:{TEXT};
             }}
             QSpinBox:hover {{ background:white; border-color:{BORDER_2}; }}
             QSpinBox:focus {{ background:white; border:1.5px solid {PRIMARY}; }}
         """)
 
-    def _mini_counter(self, title, value, icon_text, color, soft, brd):
+    def _mini_counter(self, title, value, color, soft, brd):
         card = QFrame()
-        card.setMinimumHeight(76)
+        card.setMinimumHeight(78)
         card.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE_2};
                 border:1px solid {BORDER};
-                border-radius:12px;
+                border-radius:11px;
             }}
+            QFrame:hover {{ border-color:{brd}; }}
         """)
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(14, 12, 14, 12)
-        h.setSpacing(10)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(4)
 
-        ic = QLabel(icon_text)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(40, 40)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{soft}; color:{color};
-                border:1.5px solid {brd}; border-radius:11px;
-                font-size:17px; font-weight:900;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
-        v.setSpacing(2)
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10px; color:{TEXT_MUTED}; font-weight:800;"
+            f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:800; background:transparent;"
         )
         v.addWidget(lbl)
+
         val = QLabel(value)
-        val.setStyleSheet(f"font-size:17px; color:{TEXT}; font-weight:900;")
+        val.setStyleSheet(
+            f"font-size:22px; color:{color}; font-weight:900; background:transparent;"
+        )
         v.addWidget(val)
 
-        h.addLayout(v)
-        h.addStretch()
         card._value_label = val
         return card
 
@@ -1527,12 +1849,12 @@ class DeviceConnectionPage(QWidget):
                 self.auto_listen_cb.setChecked(bool(s["auto_listen"]))
 
                 if s["last_connected"]:
-                    self._append_log(f"🕐 آخر اتصال: {s['last_connected']}")
+                    self._append_log(f"آخر اتصال: {s['last_connected']}")
 
                 if s["auto_listen"] and s["device_ip"]:
                     QTimer.singleShot(1500, self._on_connect)
         except Exception as e:
-            self._append_log(f"⚠️ لم يتم تحميل الإعدادات: {e}")
+            self._append_log(f"لم يتم تحميل الإعدادات: {e}")
 
     def _save_settings(self):
         ip = self.ip_input.text().strip()
@@ -1543,8 +1865,8 @@ class DeviceConnectionPage(QWidget):
 
         try:
             save_device_settings(ip, port, pwd, name, auto)
-            QMessageBox.information(self, "تم", "تم حفظ إعدادات الجهاز ✅")
-            self._append_log("💾 تم حفظ الإعدادات")
+            QMessageBox.information(self, "تم", "تم حفظ إعدادات الجهاز")
+            self._append_log("تم حفظ الإعدادات")
         except Exception as e:
             QMessageBox.critical(self, "خطأ", f"فشل الحفظ:\n{e}")
 
@@ -1574,7 +1896,7 @@ class DeviceConnectionPage(QWidget):
         except Exception:
             pass
 
-        self._append_log(f"🔗 محاولة الاتصال بـ {ip}:{port} ...")
+        self._append_log(f"محاولة الاتصال بـ {ip}:{port} ...")
 
         self._thread = LiveListenerThread(ip, port, pwd, self._signals)
         self._thread.start()
@@ -1584,13 +1906,53 @@ class DeviceConnectionPage(QWidget):
 
     def _on_disconnect(self):
         if self._thread and self._thread.is_alive():
-            self._append_log("⏹ طلب إيقاف الاستماع...")
+            self._append_log("طلب إيقاف الاستماع...")
             self._thread.stop()
             self._thread = None
         self._set_status("disconnected", "تم إيقاف الاستماع")
 
         self.btn_connect.setEnabled(True)
         self.btn_disconnect.setEnabled(False)
+
+    # ========================================================
+    #   ✅ سحب قائمة الموظفين من الجهاز
+    # ========================================================
+    def _on_pull_users(self):
+        ip = self.ip_input.text().strip()
+        if not ip:
+            QMessageBox.warning(self, "تنبيه", "أدخل عنوان IP للجهاز")
+            self.ip_input.setFocus()
+            return
+
+        if self._users_thread and self._users_thread.is_alive():
+            QMessageBox.information(self, "معلوم", "جاري السحب بالفعل")
+            return
+
+        port = self.port_input.value()
+        pwd = self.password_input.value()
+
+        self._append_log(f"بدء سحب قائمة الموظفين من {ip}:{port} ...")
+        self.btn_pull_users.setEnabled(False)
+        self.btn_pull_users.setText("جاري السحب...")
+
+        self._users_thread = UsersPullThread(ip, port, pwd, self._users_signals)
+        self._users_thread.start()
+
+    def _on_users_result(self, result):
+        try:
+            dlg = UsersPullResultDialog(result, self)
+            dlg.exec()
+        except Exception as e:
+            self._append_log(f"فشل عرض النتائج: {e}")
+        self._refresh_device_users()
+
+    def _on_users_status(self, status_type, message):
+        self._append_log(f"[موظفون] {message}")
+
+    def _on_users_finished(self):
+        self.btn_pull_users.setEnabled(True)
+        self.btn_pull_users.setText("سحب قائمة الموظفين من الجهاز")
+        self._refresh_device_users()
 
     # ========================================================
     #        سحب البصمات من الجهاز
@@ -1618,8 +1980,8 @@ class DeviceConnectionPage(QWidget):
         ans = QMessageBox.question(
             self, "تأكيد سحب البصمات",
             f"سيتم سحب البصمات من الجهاز خلال الفترة:\n\n"
-            f"📅  من: {from_str}\n📅  إلى: {to_str}\n\n"
-            f"سيتم إضافة بصمات الموظفين المسجّلين في النظام فقط.\n"
+            f"من: {from_str}\nإلى: {to_str}\n\n"
+            f"ملاحظة: تُحفظ جميع البصمات بما فيها أكواد غير مسجّلة بالنظام.\n"
             f"هل تريد المتابعة؟",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.Yes
@@ -1631,11 +1993,11 @@ class DeviceConnectionPage(QWidget):
         pwd = self.password_input.value()
 
         self._append_log(
-            f"📥 بدء سحب البصمات من {ip}:{port} — "
+            f"بدء سحب البصمات من {ip}:{port} — "
             f"من {from_str} إلى {to_str} ..."
         )
         self.btn_pull_punches.setEnabled(False)
-        self.btn_pull_punches.setText("⏳  جاري السحب...")
+        self.btn_pull_punches.setText("جاري السحب...")
 
         self._pull_thread = PunchesPullThread(
             ip, port, pwd, from_str, to_str, self._pull_signals
@@ -1647,7 +2009,7 @@ class DeviceConnectionPage(QWidget):
             dlg = PullResultDialog(result, self)
             dlg.exec()
         except Exception as e:
-            self._append_log(f"⚠️ فشل عرض النتائج: {e}")
+            self._append_log(f"فشل عرض النتائج: {e}")
 
         self._refresh_recent_punches()
 
@@ -1656,7 +2018,7 @@ class DeviceConnectionPage(QWidget):
 
     def _on_pull_finished(self):
         self.btn_pull_punches.setEnabled(True)
-        self.btn_pull_punches.setText("📥  ابدأ سحب البصمات")
+        self.btn_pull_punches.setText("ابدأ سحب البصمات")
         self._refresh_recent_punches()
 
     # ========================================================
@@ -1668,7 +2030,7 @@ class DeviceConnectionPage(QWidget):
         time_only = punch_time.split(" ")[1] if " " in punch_time else punch_time
         date_only = punch_time.split(" ")[0] if " " in punch_time else ""
 
-        vals = [time_only, code, name or "—", date_only, "🔴 حي"]
+        vals = [time_only, code, name or "—", date_only, "حي"]
         for c, v in enumerate(vals):
             item = QTableWidgetItem(str(v))
             item.setTextAlignment(Qt.AlignCenter)
@@ -1700,15 +2062,14 @@ class DeviceConnectionPage(QWidget):
         self._set_status(status_type, message)
         self._append_log(f"[{status_type}] {message}")
 
-        # تحديث topbar status
         if status_type == "connected":
-            self.topbar_status.setText("●  متصل")
+            self.topbar_status.setText("متصل")
             self.topbar_status.setStyleSheet(f"""
                 QLabel {{
                     background: rgba(5, 150, 105, 0.18);
                     color:#a7f3d0;
                     border:1px solid rgba(5, 150, 105, 0.4);
-                    border-radius:19px;
+                    border-radius:17px;
                     padding:0 16px;
                     font-size:11.5px;
                     font-weight:800;
@@ -1717,26 +2078,26 @@ class DeviceConnectionPage(QWidget):
             self.btn_connect.setEnabled(False)
             self.btn_disconnect.setEnabled(True)
         elif status_type == "connecting":
-            self.topbar_status.setText("●  جاري الاتصال")
+            self.topbar_status.setText("جاري الاتصال")
             self.topbar_status.setStyleSheet(f"""
                 QLabel {{
                     background: rgba(217, 119, 6, 0.18);
                     color:#fde68a;
                     border:1px solid rgba(217, 119, 6, 0.4);
-                    border-radius:19px;
+                    border-radius:17px;
                     padding:0 16px;
                     font-size:11.5px;
                     font-weight:800;
                 }}
             """)
         elif status_type == "disconnected":
-            self.topbar_status.setText("●  غير متصل")
+            self.topbar_status.setText("غير متصل")
             self.topbar_status.setStyleSheet(f"""
                 QLabel {{
                     background: rgba(148, 163, 184, 0.15);
                     color:#cbd5e1;
                     border:1px solid rgba(148, 163, 184, 0.35);
-                    border-radius:19px;
+                    border-radius:17px;
                     padding:0 16px;
                     font-size:11.5px;
                     font-weight:800;
@@ -1745,13 +2106,13 @@ class DeviceConnectionPage(QWidget):
             self.btn_connect.setEnabled(True)
             self.btn_disconnect.setEnabled(False)
         elif status_type == "error":
-            self.topbar_status.setText("●  خطأ")
+            self.topbar_status.setText("خطأ")
             self.topbar_status.setStyleSheet(f"""
                 QLabel {{
                     background: rgba(220, 38, 38, 0.18);
                     color:#fecaca;
                     border:1px solid rgba(220, 38, 38, 0.4);
-                    border-radius:19px;
+                    border-radius:17px;
                     padding:0 16px;
                     font-size:11.5px;
                     font-weight:800;
@@ -1762,59 +2123,73 @@ class DeviceConnectionPage(QWidget):
 
     def _set_status(self, status_type, message):
         if status_type == "connected":
-            self.status_icon.setText("🟢")
+            self.status_dot.setStyleSheet(
+                f"background:{SUCCESS}; border-radius:7px; border:none;"
+            )
             self.status_label.setText("متصل ويعمل")
             self.status_label.setStyleSheet(
-                f"font-size:16px; font-weight:900; color:{SUCCESS}; background:transparent;"
+                f"font-size:18px; font-weight:900; color:{SUCCESS}; "
+                f"background:transparent; border:none;"
             )
             self.status_detail.setText(message)
             self.status_box.setStyleSheet(f"""
                 QFrame {{
                     background:{SUCCESS_BG};
                     border:1.5px solid {SUCCESS_BRD};
-                    border-radius:14px;
+                    border-radius:12px;
                 }}
             """)
         elif status_type == "connecting":
-            self.status_icon.setText("🟡")
+            self.status_dot.setStyleSheet(
+                f"background:{WARNING}; border-radius:7px; border:none;"
+            )
             self.status_label.setText("جاري الاتصال...")
             self.status_label.setStyleSheet(
-                f"font-size:16px; font-weight:900; color:{WARNING}; background:transparent;"
+                f"font-size:18px; font-weight:900; color:{WARNING}; "
+                f"background:transparent; border:none;"
             )
             self.status_detail.setText(message)
             self.status_box.setStyleSheet(f"""
                 QFrame {{
                     background:{WARNING_BG};
                     border:1.5px solid {WARNING_BRD};
-                    border-radius:14px;
+                    border-radius:12px;
                 }}
             """)
         elif status_type == "error":
-            self.status_icon.setText("🔴")
+            self.status_dot.setStyleSheet(
+                f"background:{DANGER}; border-radius:7px; border:none;"
+            )
             self.status_label.setText("خطأ في الاتصال")
             self.status_label.setStyleSheet(
-                f"font-size:16px; font-weight:900; color:{DANGER}; background:transparent;"
+                f"font-size:18px; font-weight:900; color:{DANGER}; "
+                f"background:transparent; border:none;"
             )
             self.status_detail.setText(message)
             self.status_box.setStyleSheet(f"""
                 QFrame {{
                     background:{DANGER_BG};
                     border:1.5px solid {DANGER_BRD};
-                    border-radius:14px;
+                    border-radius:12px;
                 }}
             """)
         else:
-            self.status_icon.setText("⚪")
+            self.status_dot.setStyleSheet(
+                f"background:{TEXT_MUTED}; border-radius:7px; border:none;"
+            )
             self.status_label.setText("غير متصل")
             self.status_label.setStyleSheet(
-                f"font-size:16px; font-weight:900; color:{TEXT_MUTED}; background:transparent;"
+                f"font-size:18px; font-weight:900; color:{TEXT_MUTED}; "
+                f"background:transparent; border:none;"
             )
-            self.status_detail.setText(message or "أدخل IP واضغط «ربط الجهاز»")
+            self.status_detail.setText(
+                message or "أدخل IP واضغط «ربط الجهاز» لبدء الاستماع"
+            )
             self.status_box.setStyleSheet(f"""
                 QFrame {{
                     background:{SURFACE_2};
                     border:1px solid {BORDER};
-                    border-radius:14px;
+                    border-radius:12px;
                 }}
             """)
 
@@ -1827,14 +2202,125 @@ class DeviceConnectionPage(QWidget):
         )
 
     # ========================================================
+    #   ✅ تحديث جدول الموظفين على الجهاز
+    # ========================================================
+    def _refresh_device_users(self):
+        try:
+            filter_key = self.users_filter.currentData() or "all"
+            if filter_key == "unregistered":
+                rows = get_unregistered_device_users()
+            elif filter_key == "registered":
+                rows = get_registered_device_users()
+            else:
+                rows = get_device_users()
+        except Exception as e:
+            self._append_log(f"فشل تحميل قائمة الموظفين: {e}")
+            return
+
+        self.users_table.setRowCount(0)
+
+        for i, u in enumerate(rows):
+            self.users_table.insertRow(i)
+
+            # كود الموظف
+            code_item = QTableWidgetItem(str(u["user_id"] or "—"))
+            code_item.setTextAlignment(Qt.AlignCenter)
+            code_item.setForeground(QColor(TEXT))
+            f = code_item.font(); f.setBold(True); code_item.setFont(f)
+            self.users_table.setItem(i, 0, code_item)
+
+            # الاسم
+            name_item = QTableWidgetItem(str(u["name"] or "—"))
+            name_item.setTextAlignment(Qt.AlignCenter)
+            name_item.setForeground(QColor(TEXT_SEC))
+            self.users_table.setItem(i, 1, name_item)
+
+            # الحالة
+            is_registered = "emp_id" in u.keys() if hasattr(u, "keys") else False
+            if is_registered:
+                status_item = QTableWidgetItem("مسجّل")
+                status_item.setForeground(QColor(SUCCESS))
+            else:
+                status_item = QTableWidgetItem("غير مسجّل")
+                status_item.setForeground(QColor(WARNING))
+            status_item.setTextAlignment(Qt.AlignCenter)
+            f = status_item.font(); f.setBold(True); status_item.setFont(f)
+            self.users_table.setItem(i, 2, status_item)
+
+            # عدد البصمات المسجّلة لهذا الكود
+            try:
+                conn = get_connection()
+                row_cnt = conn.execute(
+                    "SELECT COUNT(*) as c FROM raw_punches WHERE employee_code=?",
+                    (str(u["user_id"]),)
+                ).fetchone()
+                conn.close()
+                cnt = row_cnt["c"] if row_cnt else 0
+            except Exception:
+                cnt = 0
+
+            cnt_item = QTableWidgetItem(str(cnt))
+            cnt_item.setTextAlignment(Qt.AlignCenter)
+            if cnt > 0:
+                cnt_item.setForeground(QColor(PRIMARY))
+                f = cnt_item.font(); f.setBold(True); cnt_item.setFont(f)
+            else:
+                cnt_item.setForeground(QColor(TEXT_MUTED))
+            self.users_table.setItem(i, 3, cnt_item)
+
+        # تحديث الإحصائيات
+        try:
+            total = count_device_users()
+            unreg = count_unregistered_device_users()
+            reg = total - unreg
+            self.du_total._value_label.setText(str(total))
+            self.du_registered._value_label.setText(str(reg))
+            self.du_unregistered._value_label.setText(str(unreg))
+
+            last_sync = get_last_device_sync_time()
+            if last_sync:
+                self.users_sync_label.setText(f"آخر مزامنة: {last_sync}")
+            else:
+                self.users_sync_label.setText("لم تتم المزامنة بعد")
+        except Exception:
+            pass
+
+    def _clear_device_users(self):
+        ans = QMessageBox.question(
+            self, "تأكيد",
+            "سيتم حذف قائمة الموظفين المحفوظة محلياً.\n"
+            "الجهاز نفسه لن يتأثر.\n\n"
+            "هل تريد المتابعة؟",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if ans != QMessageBox.Yes:
+            return
+        try:
+            delete_all_device_users()
+            self._append_log("تم حذف قائمة الموظفين المحفوظة")
+            self._refresh_device_users()
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"فشل الحذف:\n{e}")
+
+    # ========================================================
     #                  تحميل البصمات الأخيرة
     # ========================================================
     def _refresh_recent_punches(self):
         try:
             rows = get_recent_live_punches(limit=100)
         except Exception as e:
-            self._append_log(f"⚠️ فشل تحميل البصمات: {e}")
+            self._append_log(f"فشل تحميل البصمات: {e}")
             return
+
+        # نجمع أكواد الأجهزة مرة واحدة
+        try:
+            device_users_map = {
+                str(u["user_id"]): u["name"]
+                for u in get_device_users()
+            }
+        except Exception:
+            device_users_map = {}
 
         self.table.setRowCount(0)
         for i, r in enumerate(rows):
@@ -1845,16 +2331,26 @@ class DeviceConnectionPage(QWidget):
 
             src = r["source"] or "upload"
             src_map = {
-                "live": "🔴 حي",
-                "device_pull": "📥 مسحوب",
-                "upload": "📤 مرفوع",
+                "live": "حي",
+                "device_pull": "مسحوب",
+                "upload": "مرفوع",
             }
-            src_label = src_map.get(src, "📤 مرفوع")
+            src_label = src_map.get(src, "مرفوع")
+
+            # لو مش مسجل بالاسم من employees → نجيب اسمه من الجهاز
+            emp_name = r["employee_name"] or ""
+            if not emp_name:
+                code = r["employee_code"] or ""
+                dev_name = device_users_map.get(code, "")
+                if dev_name:
+                    emp_name = f"{dev_name} (غير مسجل)"
+                else:
+                    emp_name = "—"
 
             vals = [
                 time_only,
                 r["employee_code"] or "—",
-                r["employee_name"] or "—",
+                emp_name,
                 date_only,
                 src_label,
             ]

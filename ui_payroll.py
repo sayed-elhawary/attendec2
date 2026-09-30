@@ -26,7 +26,7 @@ from ui_attendance import (
 
 
 # ============================================================
-#                نظام الألوان (Modern Pro)
+#                نظام الألوان
 # ============================================================
 BG          = "#f1f5f9"
 BG_2        = "#eef2f7"
@@ -84,12 +84,12 @@ HEADER_BG   = "#f8fafc"
 
 FONT_FAMILY = "Segoe UI, Tahoma, Arial, sans-serif"
 
-# مسار اللوجو (نفس مسار ملف البرنامج)
+# مسار اللوجو
 LOGO_PATH = Path(__file__).parent / "logo.png"
 
 
 def load_logo_pixmap(size: int = 54):
-    """تحميل اللوجو من logo.png إن وُجد وإرجاع QPixmap أو None"""
+    """تحميل اللوجو من logo.png إن وُجد"""
     try:
         if LOGO_PATH.exists():
             pix = QPixmap(str(LOGO_PATH))
@@ -129,7 +129,7 @@ def fmt_money_int(v):
 
 
 def _safe_get(summary, key, default=0):
-    """قراءة آمنة من summary (لو النسخة القديمة من ui_attendance)"""
+    """قراءة آمنة من summary"""
     try:
         return summary.get(key, default) if summary else default
     except Exception:
@@ -165,6 +165,23 @@ class PayrollPage(QWidget):
         root.setSpacing(0)
         root.addWidget(self._build_topbar())
 
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background:{BG}; border:none; }}
+            QScrollBar:vertical {{
+                width:9px; background:transparent; margin:2px;
+            }}
+            QScrollBar::handle:vertical {{
+                background:{BORDER_2}; border-radius:4px; min-height:40px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background:{TEXT_MUTED}; }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{ height:0; }}
+        """)
+
         body = QWidget()
         body.setObjectName("payrollBody")
         body.setStyleSheet(f"QWidget#payrollBody {{ background:{BG}; }}")
@@ -176,7 +193,8 @@ class PayrollPage(QWidget):
         body_layout.addWidget(self._build_filters_card())
         body_layout.addWidget(self._build_table_card(), 1)
 
-        root.addWidget(body, 1)
+        scroll.setWidget(body)
+        root.addWidget(scroll, 1)
 
     # ----------------------------------------------------------
     #                       TOPBAR
@@ -184,7 +202,7 @@ class PayrollPage(QWidget):
     def _build_topbar(self):
         bar = QFrame()
         bar.setObjectName("payrollTopbar")
-        bar.setFixedHeight(96)
+        bar.setFixedHeight(76)
         bar.setStyleSheet(f"""
             QFrame#payrollTopbar {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -196,73 +214,46 @@ class PayrollPage(QWidget):
 
         h = QHBoxLayout(bar)
         h.setContentsMargins(30, 0, 30, 0)
-        h.setSpacing(18)
+        h.setSpacing(16)
 
-        # ===== اللوجو =====
-        icon = QLabel()
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(58, 58)
-
-        pix = load_logo_pixmap(54)
+        # اللوجو إن وُجد فقط
+        pix = load_logo_pixmap(46)
         if pix is not None:
-            # اللوجو الحقيقي
+            icon = QLabel()
+            icon.setAlignment(Qt.AlignCenter)
+            icon.setFixedSize(50, 50)
             icon.setPixmap(pix)
             icon.setStyleSheet(f"""
                 QLabel {{
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 {SURFACE}, stop:1 {SURFACE_2});
+                    background: {SURFACE};
                     border:1.5px solid {NAVY_ACCENT};
-                    border-radius:15px;
+                    border-radius:12px;
                     padding:2px;
                 }}
             """)
-        else:
-            # Fallback: الإيموجي
-            icon.setText("💰")
-            icon.setStyleSheet(f"""
-                QLabel {{
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #10b981, stop:1 {SUCCESS_HOV});
-                    border:1px solid {NAVY_ACCENT};
-                    border-radius:15px;
-                    font-size:24px;
-                }}
-            """)
-        apply_shadow(icon, blur=14, y_offset=2, alpha=60)
-        h.addWidget(icon)
-
-        tbox = QVBoxLayout()
-        tbox.setSpacing(4)
+            apply_shadow(icon, blur=12, y_offset=2, alpha=60)
+            h.addWidget(icon)
 
         title = QLabel("تقرير المرتبات")
         title.setStyleSheet(f"""
             QLabel {{
-                color:white; font-size:22px; font-weight:900;
+                color:white; font-size:20px; font-weight:900;
                 background:transparent; font-family:{FONT_FAMILY};
-                letter-spacing:0.3px;
             }}
         """)
-        tbox.addWidget(title)
-
-        sub = QLabel("حساب تفصيلي للمرتبات والإضافي والتأخير والانصراف المبكر والخصومات")
-        sub.setStyleSheet(
-            "QLabel { color:#94a8c4; font-size:11px; background:transparent; }"
-        )
-        tbox.addWidget(sub)
-        h.addLayout(tbox)
+        h.addWidget(title)
         h.addStretch()
 
-        # Badge مع عدد الموظفين
         self.rows_badge = QLabel("0 موظف")
         self.rows_badge.setAlignment(Qt.AlignCenter)
-        self.rows_badge.setMinimumWidth(120)
-        self.rows_badge.setFixedHeight(38)
+        self.rows_badge.setMinimumWidth(110)
+        self.rows_badge.setFixedHeight(34)
         self.rows_badge.setStyleSheet(f"""
             QLabel {{
                 background: rgba(16, 185, 129, 0.15);
                 color:#a7f3d0;
                 border:1px solid rgba(16, 185, 129, 0.35);
-                border-radius:19px; padding:0 18px;
+                border-radius:17px; padding:0 16px;
                 font-size:11.5px; font-weight:800;
             }}
         """)
@@ -282,24 +273,23 @@ class PayrollPage(QWidget):
         grid.setVerticalSpacing(14)
 
         self.stat_employees = self._stat_card(
-            "عدد الموظفين", "0", "👥",
+            "عدد الموظفين", "0",
             PRIMARY, PRIMARY_BG, PRIMARY_BRD, "موظف"
         )
         self.stat_days = self._stat_card(
-            "إجمالي أيام العمل", "0", "📅",
+            "إجمالي أيام العمل", "0",
             SUCCESS, SUCCESS_BG, SUCCESS_BRD, "يوم"
         )
         self.stat_overtime = self._stat_card(
-            "إجمالي الإضافي", "0", "➕",
+            "إجمالي الإضافي", "0",
             PURPLE, PURPLE_BG, PURPLE_BRD, "ج.م"
         )
-        # ✅ بطاقة جديدة: الانصراف المبكر
         self.stat_early = self._stat_card(
-            "إجمالي الانصراف المبكر", "0", "⏳",
+            "إجمالي الانصراف المبكر", "0",
             PINK, PINK_BG, PINK_BRD, "ج.م"
         )
         self.stat_net = self._stat_card(
-            "إجمالي الصافي", "0", "💵",
+            "إجمالي الصافي", "0",
             INFO, INFO_BG, INFO_BRD, "ج.م"
         )
 
@@ -313,74 +303,58 @@ class PayrollPage(QWidget):
             grid.setColumnStretch(c, 1)
         return wrap
 
-    def _stat_card(self, title, value, icon_text, color, soft, border_color, unit):
+    def _stat_card(self, title, value, color, soft, border_color, unit):
         card = QFrame()
         card.setObjectName("statCard")
-        card.setMinimumHeight(96)
+        card.setMinimumHeight(92)
         card.setStyleSheet(f"""
             QFrame#statCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
             QFrame#statCard:hover {{
                 border:1.5px solid {border_color};
             }}
         """)
-        apply_shadow(card, blur=16, y_offset=3, alpha=25)
+        apply_shadow(card, blur=14, y_offset=3, alpha=22)
 
-        h = QHBoxLayout(card)
-        h.setContentsMargins(16, 14, 16, 14)
-        h.setSpacing(12)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(18, 16, 18, 16)
+        v.setSpacing(8)
 
-        ic = QLabel(icon_text)
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(48, 48)
-        ic.setStyleSheet(f"""
-            QLabel {{
-                background:{soft}; color:{color};
-                border:1.5px solid {border_color};
-                border-radius:13px; font-size:20px; font-weight:900;
-            }}
-        """)
-        h.addWidget(ic)
-
-        v = QVBoxLayout()
-        v.setSpacing(2)
-
+        # العنوان
         lbl = QLabel(title)
         lbl.setStyleSheet(
-            f"font-size:10px; color:{TEXT_MUTED}; font-weight:800; "
+            f"font-size:11px; color:{TEXT_MUTED}; font-weight:700; "
             f"background:transparent; letter-spacing:0.2px;"
         )
-        lbl.setWordWrap(True)
         v.addWidget(lbl)
 
+        # القيمة + الوحدة
         vrow = QHBoxLayout()
-        vrow.setSpacing(6)
+        vrow.setSpacing(8)
 
         val = QLabel(value)
         val.setStyleSheet(
-            f"font-size:22px; color:{TEXT}; font-weight:900; background:transparent;"
+            f"font-size:24px; color:{TEXT}; font-weight:900; background:transparent;"
         )
         vrow.addWidget(val)
         vrow.addStretch()
 
         un = QLabel(unit)
         un.setStyleSheet(f"""
-            font-size:9px;
+            font-size:9.5px;
             color:{color};
             background:{soft};
             border:1px solid {border_color};
             border-radius:8px;
-            padding:2px 8px;
+            padding:3px 9px;
             font-weight:800;
         """)
         vrow.addWidget(un)
 
         v.addLayout(vrow)
-        h.addLayout(v)
-        h.addStretch()
 
         card._value_label = val
         return card
@@ -395,38 +369,29 @@ class PayrollPage(QWidget):
             QFrame#filterCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
-        apply_shadow(card, blur=18, y_offset=3, alpha=22)
+        apply_shadow(card, blur=16, y_offset=3, alpha=20)
 
         outer = QVBoxLayout(card)
         outer.setContentsMargins(22, 18, 22, 18)
         outer.setSpacing(14)
 
-        head = QHBoxLayout()
-        head.setSpacing(10)
-
-        head_icon = QLabel("🔍")
-        head_icon.setFixedSize(34, 34)
-        head_icon.setAlignment(Qt.AlignCenter)
-        head_icon.setStyleSheet(f"""
-            QLabel {{
-                background:{PRIMARY_BG};
-                border:1px solid {PRIMARY_BRD};
-                border-radius:9px; font-size:15px;
-            }}
-        """)
-        head.addWidget(head_icon)
-
+        # العنوان
         head_title = QLabel("البحث والفلاتر")
         head_title.setStyleSheet(
             f"font-size:13px; font-weight:900; color:{TEXT}; background:transparent;"
         )
-        head.addWidget(head_title)
-        head.addStretch()
-        outer.addLayout(head)
+        outer.addWidget(head_title)
 
+        # فاصل
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        outer.addWidget(line)
+
+        # الحقول
         h = QHBoxLayout()
         h.setSpacing(14)
 
@@ -436,7 +401,7 @@ class PayrollPage(QWidget):
         self.search_input.setStyleSheet(f"""
             QLineEdit {{
                 background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
+                border-radius:10px; padding:0 14px;
                 font-size:12.5px; color:{TEXT};
                 font-family:{FONT_FAMILY};
             }}
@@ -446,7 +411,7 @@ class PayrollPage(QWidget):
         self.search_input.returnPressed.connect(self._refresh)
 
         search_wrap = self._labeled("بحث (كود / اسم)", self.search_input)
-        search_wrap.setMinimumWidth(220)
+        search_wrap.setMinimumWidth(240)
         h.addWidget(search_wrap, 3)
 
         self.from_date = QDateEdit()
@@ -467,14 +432,15 @@ class PayrollPage(QWidget):
         self._style_date(self.to_date)
         h.addWidget(self._labeled("إلى تاريخ", self.to_date), 2)
 
-        btn_search = QPushButton("🔍  احسب")
+        # الأزرار
+        btn_search = QPushButton("احسب")
         btn_search.setFixedHeight(44)
         btn_search.setMinimumWidth(120)
         btn_search.setCursor(Qt.PointingHandCursor)
         btn_search.setStyleSheet(self._gradient_btn(PRIMARY, PRIMARY_HOV))
         btn_search.clicked.connect(self._refresh)
 
-        btn_export = QPushButton("📤  تصدير CSV")
+        btn_export = QPushButton("تصدير CSV")
         btn_export.setFixedHeight(44)
         btn_export.setMinimumWidth(140)
         btn_export.setCursor(Qt.PointingHandCursor)
@@ -483,12 +449,12 @@ class PayrollPage(QWidget):
 
         btn_reset = QPushButton("إعادة تعيين")
         btn_reset.setFixedHeight(44)
-        btn_reset.setMinimumWidth(120)
+        btn_reset.setMinimumWidth(130)
         btn_reset.setCursor(Qt.PointingHandCursor)
         btn_reset.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{TEXT_SEC};
-                border:1px solid {BORDER_2}; border-radius:11px;
+                border:1.5px solid {BORDER_2}; border-radius:10px;
                 padding:0 18px; font-weight:800; font-size:12px;
             }}
             QPushButton:hover {{
@@ -537,7 +503,7 @@ class PayrollPage(QWidget):
         w.setStyleSheet(f"""
             QDateEdit {{
                 background:{SURFACE_2}; border:1.5px solid {BORDER};
-                border-radius:11px; padding:0 14px;
+                border-radius:10px; padding:0 14px;
                 font-size:12.5px; color:{TEXT}; font-weight:700;
             }}
             QDateEdit:hover {{ background:white; border-color:{BORDER_2}; }}
@@ -558,7 +524,7 @@ class PayrollPage(QWidget):
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {c1}, stop:1 {c2});
                 color:white; border:none;
-                border-radius:11px; padding:0 22px;
+                border-radius:10px; padding:0 22px;
                 font-weight:900; font-size:12.5px;
                 font-family:{FONT_FAMILY};
             }}
@@ -579,54 +545,40 @@ class PayrollPage(QWidget):
             QFrame#tableCard {{
                 background:{SURFACE};
                 border:1px solid {BORDER};
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
-        apply_shadow(card, blur=20, y_offset=4, alpha=25)
+        apply_shadow(card, blur=18, y_offset=4, alpha=22)
 
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
         head = QFrame()
-        head.setFixedHeight(80)
+        head.setFixedHeight(60)
         head.setStyleSheet(f"""
             QFrame {{
                 background:{SURFACE};
                 border-bottom:1px solid {DIVIDER};
-                border-top-left-radius:16px;
-                border-top-right-radius:16px;
+                border-top-left-radius:14px;
+                border-top-right-radius:14px;
             }}
         """)
         hl = QHBoxLayout(head)
-        hl.setContentsMargins(24, 0, 24, 0)
-        hl.setSpacing(14)
+        hl.setContentsMargins(22, 0, 22, 0)
+        hl.setSpacing(12)
 
-        hicon = QLabel("📋")
-        hicon.setFixedSize(40, 40)
-        hicon.setAlignment(Qt.AlignCenter)
-        hicon.setStyleSheet(f"""
-            QLabel {{
-                background:{SUCCESS_BG};
-                border:1px solid {SUCCESS_BRD};
-                border-radius:11px; font-size:18px;
-            }}
-        """)
-        hl.addWidget(hicon)
-
-        tbox = QVBoxLayout()
-        tbox.setSpacing(3)
         title = QLabel("كشف المرتبات التفصيلي")
-        title.setStyleSheet(f"font-size:15px; font-weight:900; color:{TEXT};")
-        tbox.addWidget(title)
-        hint = QLabel("انقر مرتين على أي صف لعرض التفاصيل المالية الكاملة")
-        hint.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
-        tbox.addWidget(hint)
-        hl.addLayout(tbox)
+        title.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+        hl.addWidget(title)
         hl.addStretch()
+
+        hint = QLabel("انقر مرتين على أي صف لعرض التفاصيل")
+        hint.setStyleSheet(f"font-size:10.5px; color:{TEXT_MUTED};")
+        hl.addWidget(hint)
         v.addWidget(head)
 
-        # ✅ أضفنا عمود "انصراف مبكر" → 19 عمود
+        # 19 عمود
         self.table = QTableWidget(0, 19)
         self.table.setHorizontalHeaderLabels([
             "كود الموظف", "اسم الموظف", "الوظيفة",
@@ -644,6 +596,7 @@ class PayrollPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setAlternatingRowColors(True)
+        self.table.setMinimumHeight(420)
         self.table.setStyleSheet(f"""
             QTableWidget {{
                 background:{SURFACE}; border:none; color:{TEXT};
@@ -795,24 +748,21 @@ class PayrollPage(QWidget):
         daily = total_salary / 30.0 if total_salary else 0.0
         hourly = daily / work_hours if work_hours else 0.0
 
-        # ================== الخصومات ==================
+        # الخصومات
         absent_days = summary["absent"]
         absence_ded = absent_days * daily
 
         sick_ded_days = summary["_total_sick_deduction"]
         sick_ded_value = sick_ded_days * daily
 
-        # ✅ التأخير
         delay_min = summary["_total_delay_min"]
         delay_hours = delay_min / 60.0
         delay_ded = delay_hours * hourly
 
-        # ✅✅ الانصراف المبكر — جديد
         early_min = _safe_get(summary, "_total_early_leave_min", 0)
         early_hours = early_min / 60.0
         early_ded = early_hours * hourly
 
-        # خصم البدلات بنسبة الغياب
         meal_ded_per_day = meal / 30.0 if meal else 0.0
         transport_ded_per_day = transport / 30.0 if transport else 0.0
         other_ded_per_day = other_allow / 30.0 if other_allow else 0.0
@@ -825,21 +775,19 @@ class PayrollPage(QWidget):
 
         allowances_ded_total = meal_ded + transport_ded + other_ded + expat_ded
 
-        # الإضافي
         ot_min = summary["_total_overtime_min"]
         ot_hours = ot_min / 60.0
         ot_pay = ot_hours * hourly * ot_rate
 
-        # ================== الإجماليات ==================
+        # الإجماليات
         gross = total_salary + allowances_total + ot_pay
 
-        # ✅✅ أضفنا early_ded إلى إجمالي الخصومات
         total_deductions = (
             absence_ded
             + allowances_ded_total
             + sick_ded_value
             + delay_ded
-            + early_ded              # ← جديد
+            + early_ded
             + medical
             + social
         )
@@ -869,9 +817,9 @@ class PayrollPage(QWidget):
 
             "delay_min": delay_min,
             "delay_ded": delay_ded,
-            "early_min": early_min,           # ← جديد
-            "early_hours": early_hours,       # ← جديد
-            "early_ded": early_ded,           # ← جديد
+            "early_min": early_min,
+            "early_hours": early_hours,
+            "early_ded": early_ded,
             "ot_min": ot_min,
             "ot_hours": ot_hours,
             "ot_pay": ot_pay,
@@ -1028,7 +976,7 @@ class PayrollPage(QWidget):
             c9.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(i, 9, c9)
 
-            # ✅✅ 10: الانصراف المبكر — جديد
+            # 10: الانصراف المبكر
             if r["early_ded"] > 0:
                 c10 = QTableWidgetItem(fmt_money_int(r["early_ded"]))
                 c10.setForeground(QColor(PINK))
@@ -1098,7 +1046,7 @@ class PayrollPage(QWidget):
             c17.setForeground(QColor(SUCCESS if r["expat"] else TEXT_MUTED))
             self.table.setItem(i, 17, c17)
 
-            # 18: الصافي (شارة)
+            # 18: الصافي
             net_wrap = QWidget()
             net_wrap.setStyleSheet("background:transparent;")
             nl = QHBoxLayout(net_wrap)
@@ -1110,7 +1058,7 @@ class PayrollPage(QWidget):
             net_lbl.setStyleSheet(f"""
                 background:{SUCCESS_BG}; color:{SUCCESS};
                 border:1.5px solid {SUCCESS_BRD};
-                padding:6px 14px; border-radius:11px;
+                padding:6px 14px; border-radius:10px;
                 font-weight:900; font-size:12px;
                 font-family:{FONT_FAMILY};
             """)
@@ -1135,13 +1083,13 @@ class PayrollPage(QWidget):
         total = len(self._rows)
         total_days = sum(r["present"] for r in self._rows)
         total_ot = sum(r["ot_pay"] for r in self._rows)
-        total_early = sum(r["early_ded"] for r in self._rows)     # ✅
+        total_early = sum(r["early_ded"] for r in self._rows)
         total_net = sum(r["net"] for r in self._rows)
 
         self.stat_employees._value_label.setText(str(total))
         self.stat_days._value_label.setText(str(total_days))
         self.stat_overtime._value_label.setText(fmt_money_int(total_ot))
-        self.stat_early._value_label.setText(fmt_money_int(total_early))   # ✅
+        self.stat_early._value_label.setText(fmt_money_int(total_early))
         self.stat_net._value_label.setText(fmt_money_int(total_net))
         self.rows_badge.setText(f"{total} موظف")
 
@@ -1162,7 +1110,6 @@ class PayrollPage(QWidget):
         try:
             with open(file_path, "w", encoding="utf-8-sig", newline="") as f:
                 w = csv.writer(f)
-                # ✅ أضفنا عمود الانصراف المبكر
                 w.writerow([
                     "كود الموظف", "اسم الموظف", "الوظيفة",
                     "أيام العمل", "الغياب", "خصم البدلات",
@@ -1181,7 +1128,7 @@ class PayrollPage(QWidget):
                         r["annual_leaves"],
                         f"{fmt_money_int(r['sick_ded_value'])}",
                         f"{fmt_money_int(r['delay_ded'])}",
-                        f"{fmt_money_int(r['early_ded'])}",     # ✅ جديد
+                        f"{fmt_money_int(r['early_ded'])}",
                         f"{fmt_money_int(r['ot_pay'])}",
                         f"{fmt_money_int(r['medical'])}",
                         f"{fmt_money_int(r['social'])}",
@@ -1261,7 +1208,7 @@ class PayrollDetailDialog(QDialog):
             QFrame {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 {NAVY}, stop:0.5 {NAVY_2}, stop:1 {NAVY_3});
-                border-radius:16px;
+                border-radius:14px;
             }}
         """)
         apply_shadow(head, blur=20, y_offset=4, alpha=60)
@@ -1269,33 +1216,6 @@ class PayrollDetailDialog(QDialog):
         hl = QHBoxLayout(head)
         hl.setContentsMargins(22, 18, 22, 18)
         hl.setSpacing(16)
-
-        ic = QLabel()
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setFixedSize(56, 56)
-        pix = load_logo_pixmap(52)
-        if pix is not None:
-            ic.setPixmap(pix)
-            ic.setStyleSheet(f"""
-                QLabel {{
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 {SURFACE}, stop:1 {SURFACE_2});
-                    border:1.5px solid {NAVY_ACCENT};
-                    border-radius:14px;
-                    padding:2px;
-                }}
-            """)
-        else:
-            ic.setText("💰")
-            ic.setStyleSheet(f"""
-                QLabel {{
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #10b981, stop:1 {SUCCESS_HOV});
-                    border:1px solid {NAVY_ACCENT};
-                    border-radius:14px; font-size:23px;
-                }}
-            """)
-        hl.addWidget(ic)
 
         tbox = QVBoxLayout()
         tbox.setSpacing(4)
@@ -1305,8 +1225,8 @@ class PayrollDetailDialog(QDialog):
         )
         tbox.addWidget(title)
         sub = QLabel(
-            f"الفترة: {self.from_date}  →  {self.to_date}   ·   "
-            f"الوظيفة: {self.row['department']}   ·   "
+            f"الفترة: {self.from_date}  →  {self.to_date}      "
+            f"الوظيفة: {self.row['department']}      "
             f"الشيفت: {self.row['shift_name']}"
         )
         sub.setStyleSheet("font-size:11px; color:#9db3cf; background:transparent;")
@@ -1315,14 +1235,14 @@ class PayrollDetailDialog(QDialog):
         hl.addLayout(tbox)
         hl.addStretch()
 
-        net_lbl = QLabel(f"💵  {fmt_money_int(self.row['net'])} ج.م")
+        net_lbl = QLabel(f"{fmt_money_int(self.row['net'])} ج.م")
         net_lbl.setAlignment(Qt.AlignCenter)
         net_lbl.setStyleSheet(f"""
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                 stop:0 {SUCCESS_BG}, stop:1 #d1fae5);
             color:{SUCCESS};
-            padding:10px 22px; border-radius:14px;
-            font-size:15px; font-weight:900;
+            padding:10px 24px; border-radius:12px;
+            font-size:16px; font-weight:900;
             border:1.5px solid {SUCCESS_BRD};
         """)
         hl.addWidget(net_lbl)
@@ -1352,7 +1272,7 @@ class PayrollDetailDialog(QDialog):
         btn_close.setStyleSheet(f"""
             QPushButton {{
                 background:{SURFACE}; color:{TEXT_SEC};
-                border:1.5px solid {BORDER_2}; border-radius:11px;
+                border:1.5px solid {BORDER_2}; border-radius:10px;
                 padding:0 26px; font-weight:800; font-size:12.5px;
             }}
             QPushButton:hover {{
@@ -1374,37 +1294,36 @@ class PayrollDetailDialog(QDialog):
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(12)
 
-        # ✅ أضفنا "انصراف مبكر"
         cards_data = [
-            ("أيام العمل", f"{r['present']}/{r['total_working']}", "📅",
+            ("أيام العمل", f"{r['present']}/{r['total_working']}",
              PRIMARY, PRIMARY_BG, PRIMARY_BRD),
-            ("الغياب", str(r["absent"]), "❌",
+            ("الغياب", str(r["absent"]),
              DANGER, DANGER_BG, DANGER_BRD),
             ("رصيد الإجازة",
-             f"{_fmt_num(r['annual_remaining'])}/{_fmt_num(r['annual_initial'])}", "🌴",
+             f"{_fmt_num(r['annual_remaining'])}/{_fmt_num(r['annual_initial'])}",
              INFO, INFO_BG, INFO_BRD),
-            ("إجازة بالفترة", str(r["annual_leaves"]), "📆",
+            ("إجازة بالفترة", str(r["annual_leaves"]),
              INFO, INFO_BG, INFO_BRD),
-            ("إجازة مرضية", str(r["sick_leaves"]), "💊",
+            ("إجازة مرضية", str(r["sick_leaves"]),
              WARNING, WARNING_BG, WARNING_BRD),
-            ("إصابة عمل", str(r["work_injuries"]), "🩹",
+            ("إصابة عمل", str(r["work_injuries"]),
              PINK, PINK_BG, PINK_BRD),
-            ("التأخير", format_minutes_ar(int(r["delay_min"])), "⏱",
+            ("التأخير", format_minutes_ar(int(r["delay_min"])),
              WARNING, WARNING_BG, WARNING_BRD),
-            ("انصراف مبكر", format_minutes_ar(int(r["early_min"])), "⏳",
+            ("انصراف مبكر", format_minutes_ar(int(r["early_min"])),
              PINK, PINK_BG, PINK_BRD),
-            ("الإضافي", f"{r['ot_hours']:.2f}س", "➕",
+            ("الإضافي", f"{r['ot_hours']:.2f} س",
              PURPLE, PURPLE_BG, PURPLE_BRD),
         ]
 
-        for i, (t, val, ic, color, bg, brd) in enumerate(cards_data):
+        for i, (t, val, color, bg, brd) in enumerate(cards_data):
             card = QFrame()
-            card.setMinimumHeight(78)
+            card.setMinimumHeight(72)
             card.setStyleSheet(f"""
                 QFrame {{
                     background:{SURFACE};
                     border:1px solid {BORDER};
-                    border-radius:13px;
+                    border-radius:12px;
                 }}
                 QFrame:hover {{
                     border:1.5px solid {brd};
@@ -1412,38 +1331,21 @@ class PayrollDetailDialog(QDialog):
             """)
             apply_shadow(card, blur=10, y_offset=2, alpha=18)
 
-            h = QHBoxLayout(card)
-            h.setContentsMargins(14, 12, 14, 12)
-            h.setSpacing(10)
+            v = QVBoxLayout(card)
+            v.setContentsMargins(14, 12, 14, 12)
+            v.setSpacing(4)
 
-            icon = QLabel(ic)
-            icon.setAlignment(Qt.AlignCenter)
-            icon.setFixedSize(42, 42)
-            icon.setStyleSheet(f"""
-                QLabel {{
-                    background:{bg}; color:{color};
-                    border:1.5px solid {brd};
-                    border-radius:11px; font-size:18px;
-                    font-weight:900;
-                }}
-            """)
-            h.addWidget(icon)
-
-            vv = QVBoxLayout()
-            vv.setSpacing(2)
             lbl = QLabel(t)
             lbl.setStyleSheet(
-                f"font-size:10px; color:{TEXT_MUTED}; font-weight:800;"
+                f"font-size:10.5px; color:{TEXT_MUTED}; font-weight:700;"
             )
-            vv.addWidget(lbl)
-            vv2 = QLabel(val)
-            vv2.setStyleSheet(
-                f"font-size:16px; color:{TEXT}; font-weight:900;"
-            )
-            vv.addWidget(vv2)
+            v.addWidget(lbl)
 
-            h.addLayout(vv)
-            h.addStretch()
+            vv = QLabel(val)
+            vv.setStyleSheet(
+                f"font-size:17px; color:{color}; font-weight:900;"
+            )
+            v.addWidget(vv)
 
             grid.addWidget(card, i // 5, i % 5)
 
@@ -1471,7 +1373,6 @@ class PayrollDetailDialog(QDialog):
             ("خصم بدل انتماء", r["expat_ded"]),
         ]
 
-        # ✅ أضفنا "خصم الانصراف المبكر"
         deductions = [
             ("خصم الغياب (من الإجمالي)", r["absence_ded"]),
             ("خصم الإجازة المرضية", r["sick_ded_value"]),
@@ -1485,18 +1386,18 @@ class PayrollDetailDialog(QDialog):
         grid.setSpacing(16)
 
         earn_card = self._make_section_card(
-            "💵  الاستحقاقات", earnings, SUCCESS, SUCCESS_BG, SUCCESS_BRD,
+            "الاستحقاقات", earnings, SUCCESS, SUCCESS_BG, SUCCESS_BRD,
             total_label="إجمالي الاستحقاقات", total_value=r["gross"],
             extra_items=[
                 ("الراتب الأساسي", r["base"]),
                 ("الحافز", r["incentive"]),
             ],
-            extra_title="تفصيل الراتب الإجمالي (للمراجعة)"
+            extra_title="تفصيل الراتب الإجمالي"
         )
         grid.addWidget(earn_card, 1)
 
         ded_card = self._make_section_card(
-            "📉  الخصومات", deductions, DANGER, DANGER_BG, DANGER_BRD,
+            "الخصومات", deductions, DANGER, DANGER_BG, DANGER_BRD,
             total_label="إجمالي الخصومات", total_value=r["total_deductions"],
             extra_items=allowances_ded_breakdown,
             extra_title="خصم البدلات (بنسبة الغياب)"
@@ -1527,9 +1428,9 @@ class PayrollDetailDialog(QDialog):
 
         head = QLabel(title)
         head.setStyleSheet(f"""
-            font-size:13.5px; font-weight:900; color:{color};
+            font-size:13px; font-weight:900; color:{color};
             background:{bg}; border:1.5px solid {brd};
-            padding:10px 14px; border-radius:11px;
+            padding:10px 14px; border-radius:10px;
         """)
         head.setAlignment(Qt.AlignCenter)
         v.addWidget(head)
@@ -1575,7 +1476,6 @@ class PayrollDetailDialog(QDialog):
                     font-weight:800;
                     background:transparent;
                     padding:4px 0;
-                    letter-spacing:0.3px;
                 """)
                 v.addWidget(et)
 
@@ -1645,22 +1545,17 @@ class PayrollDetailDialog(QDialog):
         v.setContentsMargins(22, 26, 22, 26)
         v.setSpacing(12)
 
-        ic = QLabel("💵")
-        ic.setAlignment(Qt.AlignCenter)
-        ic.setStyleSheet("font-size:48px; background:transparent;")
-        v.addWidget(ic)
-
         lbl = QLabel("صافي المرتب")
         lbl.setAlignment(Qt.AlignCenter)
         lbl.setStyleSheet(
-            "font-size:13.5px; color:#d1fae5; background:transparent; font-weight:800;"
+            "font-size:13px; color:#d1fae5; background:transparent; font-weight:800;"
         )
         v.addWidget(lbl)
 
         val = QLabel(f"{fmt_money(r['net'])}")
         val.setAlignment(Qt.AlignCenter)
         val.setStyleSheet(
-            "font-size:26px; color:white; background:transparent; font-weight:900;"
+            "font-size:28px; color:white; background:transparent; font-weight:900;"
         )
         v.addWidget(val)
 
@@ -1676,7 +1571,6 @@ class PayrollDetailDialog(QDialog):
         line.setStyleSheet("background:rgba(255,255,255,0.25);")
         v.addWidget(line)
 
-        # ✅ أضفنا "خصم الانصراف المبكر"
         info_lines = [
             ("الإجمالي (أساسي+حافز)", r["total_salary"]),
             ("البدلات الكاملة", r["allowances_total"]),
